@@ -14,8 +14,7 @@ self-contained and usable programmatically without any network access.
 
 - **Login**: Email-code (magic-link) login. `CLAUDE_USERNAME` from `.env`
   is entered automatically; the human completes the login by clicking the
-  emailed button while the browser waits, headed. `CLAUDE_PASSWORD` is
-  unused (stays empty).
+  emailed button while the browser waits, headed.
 - **Output**: JSON export — raw captured API payload per conversation plus
   a manifest. No HTML/markdown rendering.
 - **Fidelity**: Full — messages, artifacts (as text), and all media
