@@ -1,0 +1,92 @@
+{
+  "uuid": "16af74c8-d201-5748-9dc9-b016e7896d4b",
+  "name": "Sample conversation title",
+  "summary": "Synthetic summary content 1",
+  "model": "synthetic-model",
+  "created_at": "2026-10-01T12:00:05Z",
+  "updated_at": "2026-10-01T12:00:05Z",
+  "settings": {
+    "enabled_web_search": true,
+    "enabled_monkeys_in_a_barrel": false,
+    "enabled_saffron": true,
+    "tool_search_mode": "auto",
+    "thinking_mode": "auto",
+    "effort_level": "medium",
+    "chat_memory_mode": "enabled",
+    "preview_feature_uses_artifacts": true,
+    "enabled_turmeric": true
+  },
+  "is_starred": false,
+  "is_archived": false,
+  "is_temporary": false,
+  "workspace_upgraded": false,
+  "platform": "CLAUDE_AI",
+  "is_wiggle_enabled": false,
+  "effective_thinking_mode": "auto",
+  "current_leaf_message_uuid": "34ba4548-3542-5073-ab31-b9b3aba20d50",
+  "chat_messages": [
+    {
+      "uuid": "8a7bc002-2234-56eb-bafa-cf28938a244f",
+      "text": "Synthetic text content 3",
+      "content": [
+        {
+          "start_timestamp": "2026-10-04T18:46:21.317886Z",
+          "stop_timestamp": "2026-10-04T18:46:21.317886Z",
+          "type": "text",
+          "text": "Synthetic text content 3",
+          "citations": []
+        }
+      ],
+      "sender": "human",
+      "index": 0,
+      "created_at": "2026-10-01T12:00:00Z",
+      "updated_at": "2026-10-01T12:00:00Z",
+      "truncated": false,
+      "attachments": [],
+      "files": [],
+      "sync_sources": [],
+      "parent_message_uuid": "9ee9e898-683b-5b80-8fc5-5cf00657e8fe"
+    },
+    {
+      "uuid": "45b0329c-8a2f-52c5-93ec-c35b81d60911",
+      "text": "Synthetic text content 5",
+      "content": [
+        {
+          "start_timestamp": "2026-10-04T18:46:21.817821Z",
+          "stop_timestamp": "2026-10-04T18:46:30.932503Z",
+          "type": "thinking",
+          "thinking": "Synthetic thinking content 5",
+          "summaries": [
+            {
+              "summary": "Synthetic summary content 5"
+            },
+            {
+              "summary": "Synthetic summary content 5"
+            }
+          ],
+          "cut_off": false,
+          "truncated": true,
+          "hidden": false,
+          "thinking_hidden": true
+        },
+        {
+          "start_timestamp": "2026-10-04T18:46:42.692157Z",
+          "stop_timestamp": "2026-10-04T18:46:42.692157Z",
+          "type": "text",
+          "text": "Synthetic text content 5",
+          "citations": []
+        }
+      ],
+      "sender": "assistant",
+      "index": 1,
+      "created_at": "2026-10-01T12:00:03Z",
+      "updated_at": "2026-10-01T12:00:03Z",
+      "truncated": false,
+      "stop_reason": "end_turn",
+      "attachments": [],
+      "files": [],
+      "sync_sources": [],
+      "parent_message_uuid": "739bea0d-27f8-5e8f-b370-0ec33c76b8d2"
+    }
+  ]
+}
