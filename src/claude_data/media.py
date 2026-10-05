@@ -1,9 +1,13 @@
 import hashlib
+import re
 import urllib.parse
 from dataclasses import dataclass
 from pathlib import Path
 
-from claude_data.store import media_path
+from playwright.sync_api import BrowserContext
+from playwright.sync_api import Error as PlaywrightError
+
+from claude_data.store import atomic_write_bytes, media_path
 
 
 @dataclass(frozen=True)
@@ -64,6 +68,8 @@ def plan_downloads(urls: list[str], root: Path) -> DownloadPlan:
     return DownloadPlan(to_download=to_download, present=present)
 
 
+_URL_IN_TEXT = re.compile(r"https?://[^\s\"'<>)\]}]+")
+
 MEDIA_EXTENSIONS = frozenset(
     {
         ".png",
@@ -106,8 +112,11 @@ def _iter_urls(node: object):
     elif isinstance(node, list):
         for item in node:
             yield from _iter_urls(item)
-    elif isinstance(node, str) and node.startswith(("http://", "https://")):
-        yield node
+    elif isinstance(node, str):
+        for match in _URL_IN_TEXT.findall(node):
+            yield match.rstrip(".,;:!?")
+
+
 
 
 def extract_media_urls(payload: dict) -> list[str]:
@@ -119,3 +128,27 @@ def extract_media_urls(payload: dict) -> list[str]:
         seen.add(url)
         urls.append(url)
     return urls
+
+
+def download_media(
+    context: BrowserContext, downloads: list[tuple[str, str]], root: Path
+) -> tuple[dict[str, str], list[str]]:
+    successes: dict[str, str] = {}
+    failures: list[str] = []
+    for url, filename in downloads:
+        target = media_path(root, filename)
+        if target.exists():
+            successes[url] = f"media/{filename}"
+            continue
+        try:
+            response = context.request.get(url)
+            if not response.ok:
+                failures.append(url)
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            atomic_write_bytes(target, response.body())
+        except (PlaywrightError, OSError):
+            failures.append(url)
+            continue
+        successes[url] = f"media/{filename}"
+    return successes, failures

@@ -1,4 +1,10 @@
+from collections.abc import Callable
+from pathlib import Path
+
 from playwright.sync_api import Page
+
+from claude_data.media import extract_media_urls, plan_downloads, rewrite_urls
+from claude_data.store import atomic_write_json, conversation_path, meta_path
 
 CHATS_URL = "https://claude.ai/chats"
 CONVERSATION_URL = "https://claude.ai/chat/{uuid}"
@@ -52,3 +58,27 @@ def capture_payload(page: Page, uuid: str) -> dict | None:
         return None
     body = result.get("body")
     return body if isinstance(body, dict) else None
+
+
+class CaptureError(RuntimeError):
+    pass
+
+
+def process_conversation(
+    root: Path,
+    uuid: str,
+    capture: Callable[[str], dict | None],
+    download: Callable[[list[tuple[str, str]]], tuple[dict[str, str], list[str]]],
+) -> None:
+    payload = capture(uuid)
+    if payload is None:
+        raise CaptureError(f"no payload captured for {uuid}")
+    plan = plan_downloads(extract_media_urls(payload), root)
+    successes, failures = download(plan.to_download) if plan.to_download else ({}, [])
+    mapping = dict(plan.present)
+    mapping.update(successes)
+    atomic_write_json(conversation_path(root, uuid), rewrite_urls(payload, mapping))
+    atomic_write_json(
+        meta_path(root, uuid),
+        {"media": mapping, "media_failures": sorted(failures)},
+    )
