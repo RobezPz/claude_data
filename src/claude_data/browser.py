@@ -16,12 +16,17 @@ def launch(headless: bool = True) -> BrowserContext:
     if _playwright is None:
         _playwright = sync_playwright().start()
     return _playwright.chromium.launch_persistent_context(
-        str(PROFILE_DIR), headless=headless
+        str(PROFILE_DIR),
+        headless=headless,
+        ignore_default_args=["--enable-automation"],
+        args=["--disable-blink-features=AutomationControlled"],
     )
 
 
 def is_logged_in(page: Page) -> bool:
     page.goto("https://claude.ai/chats", wait_until="domcontentloaded")
+    if page.title().startswith("Just a moment"):
+        return False
     return "/login" not in page.url
 
 
