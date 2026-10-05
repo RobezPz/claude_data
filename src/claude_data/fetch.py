@@ -1,10 +1,17 @@
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 from playwright.sync_api import Page
 
+from claude_data.collect import ConversationRef
 from claude_data.media import extract_media_urls, plan_downloads, rewrite_urls
-from claude_data.store import atomic_write_json, conversation_path, meta_path
+from claude_data.store import (
+    atomic_write_json,
+    conversation_path,
+    list_archived,
+    meta_path,
+)
 
 CHATS_URL = "https://claude.ai/chats"
 CONVERSATION_URL = "https://claude.ai/chat/{uuid}"
@@ -82,3 +89,40 @@ def process_conversation(
         meta_path(root, uuid),
         {"media": mapping, "media_failures": sorted(failures)},
     )
+
+
+@dataclass(frozen=True)
+class FetchReport:
+    fetched: list[str]
+    failed: list[str]
+    skipped: int
+
+
+CAPTURE_ATTEMPTS = 3
+
+
+def fetch_all(
+    refs: list[ConversationRef],
+    root: Path,
+    fetch_one: Callable[[str], None],
+    force: bool = False,
+    refresh_uuids: frozenset[str] = frozenset(),
+) -> FetchReport:
+    archived = set() if force else list_archived(root)
+    fetched: list[str] = []
+    failed: list[str] = []
+    skipped = 0
+    for ref in refs:
+        if ref.uuid in archived and ref.uuid not in refresh_uuids:
+            skipped += 1
+            continue
+        for attempt in range(CAPTURE_ATTEMPTS):
+            try:
+                fetch_one(ref.uuid)
+            except CaptureError:
+                continue
+            fetched.append(ref.uuid)
+            break
+        else:
+            failed.append(ref.uuid)
+    return FetchReport(fetched=fetched, failed=failed, skipped=skipped)
