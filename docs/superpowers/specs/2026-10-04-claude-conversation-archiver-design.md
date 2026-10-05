@@ -37,14 +37,17 @@ repo, never committed) holds the authenticated session:
   claude.ai, enter the email from `.env`, submit, then wait (generous
   timeout: 10 minutes) while the human completes the emailed-code login.
   Success is detected by the chats page loading.
-- Subsequent runs: reuse the session **headless**.
+- Subsequent runs: reuse the session, still **headed**. (Amended after
+  implementation: Cloudflare challenges every headless build, so headless
+  reuse does not work; the window stays visible for the whole run.)
 
 ## Components (src/claude_data/)
 
 - `__init__.py` — `main()`: CLI parsing (argparse) + orchestration; remains
   the console-script entry.
-- `browser.py` — persistent-context session management: launch (headed for
-  login, headless otherwise), logged-out detection, response-capture hook.
+- `browser.py` — persistent-context session management: headed launch (the
+  only mode Cloudflare allows) with automation flags stripped, logged-out
+  detection, response-capture hook.
 - `login.py` — the email-code interactive login flow.
 - `collect.py` — open `https://claude.ai/chats`, auto-scroll "Recent"
   until 3 consecutive scroll attempts yield no new conversations,
@@ -103,7 +106,7 @@ download failures.
   session is missing/expired).
 - `--login` — force a fresh interactive login.
 - `--refresh [UUID]` — re-fetch all, or one conversation.
-- `--headed` — run visibly (debugging).
+- `--headed` — accepted for compatibility; runs are always visible.
 
 No other flags.
 
@@ -144,4 +147,5 @@ No other flags.
 - HTML/Markdown rendering or any viewer.
 - Incremental conversation diffing/merging (re-fetch replaces wholesale via
   `--refresh`).
-- Scheduling, multi-account support, headless first-run login.
+- Scheduling, multi-account support, headless operation (Cloudflare-blocked;
+  would need a stealth browser build).
