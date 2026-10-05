@@ -77,3 +77,8 @@ def test_extract_media_urls_keeps_media_only_and_dedupes():
 
 def test_extract_media_urls_alien_payload():
     assert extract_media_urls({"x": 1}) == []
+
+
+def test_extract_media_urls_ignores_unparsable_urls():
+    payload = {"text": "broken http://[ link and fine https://cdn.example.com/a.png"}
+    assert extract_media_urls(payload) == ["https://cdn.example.com/a.png"]

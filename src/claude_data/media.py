@@ -95,7 +95,10 @@ MEDIA_HOST_SUFFIXES = ("claude.ai", "claudeusercontent.com")
 
 
 def _is_media_url(url: str) -> bool:
-    parts = urllib.parse.urlsplit(url)
+    try:
+        parts = urllib.parse.urlsplit(url)
+    except ValueError:
+        return False
     if parts.scheme not in ("http", "https"):
         return False
     host = parts.netloc.lower()
