@@ -62,3 +62,60 @@ def plan_downloads(urls: list[str], root: Path) -> DownloadPlan:
         else:
             to_download.append((url, filename))
     return DownloadPlan(to_download=to_download, present=present)
+
+
+MEDIA_EXTENSIONS = frozenset(
+    {
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".webp",
+        ".svg",
+        ".avif",
+        ".bmp",
+        ".pdf",
+        ".mp4",
+        ".webm",
+        ".mov",
+        ".mp3",
+        ".m4a",
+        ".wav",
+        ".ogg",
+    }
+)
+
+MEDIA_HOST_SUFFIXES = ("claude.ai", "claudeusercontent.com")
+
+
+def _is_media_url(url: str) -> bool:
+    parts = urllib.parse.urlsplit(url)
+    if parts.scheme not in ("http", "https"):
+        return False
+    host = parts.netloc.lower()
+    if host.endswith(MEDIA_HOST_SUFFIXES):
+        return True
+    suffix = Path(parts.path).suffix.lower()
+    return suffix in MEDIA_EXTENSIONS
+
+
+def _iter_urls(node: object):
+    if isinstance(node, dict):
+        for value in node.values():
+            yield from _iter_urls(value)
+    elif isinstance(node, list):
+        for item in node:
+            yield from _iter_urls(item)
+    elif isinstance(node, str) and node.startswith(("http://", "https://")):
+        yield node
+
+
+def extract_media_urls(payload: dict) -> list[str]:
+    urls: list[str] = []
+    seen: set[str] = set()
+    for url in _iter_urls(payload):
+        if url in seen or not _is_media_url(url):
+            continue
+        seen.add(url)
+        urls.append(url)
+    return urls
