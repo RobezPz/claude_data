@@ -26,14 +26,20 @@ def atomic_write_bytes(path: Path, data: bytes) -> None:
 
 
 def atomic_write_json(path: Path, obj: object) -> None:
-    atomic_write_bytes(path, json.dumps(obj, indent=2, ensure_ascii=False).encode("utf-8"))
+    atomic_write_bytes(
+        path, json.dumps(obj, indent=2, ensure_ascii=False).encode("utf-8")
+    )
 
 
 def list_archived(root: Path) -> set[str]:
     conversations = root / "conversations"
     if not conversations.is_dir():
         return set()
-    return {p.stem for p in conversations.glob("*.json") if not p.name.endswith(".meta.json")}
+    return {
+        p.stem
+        for p in conversations.glob("*.json")
+        if not p.name.endswith(".meta.json")
+    }
 
 
 def extract_metadata(payload: dict) -> dict:

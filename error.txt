@@ -1,0 +1,7 @@
+Server plugin error
+Plugin: jev-observer
+Status: failed
+Runtime: server
+Source: jev-observer
+Error: Plugin failed to load
+Reference: err_a292787c

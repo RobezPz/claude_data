@@ -16,4 +16,6 @@ def test_require_username_missing_raises_without_leaking_values():
 
 
 def test_require_username_present_returns_value():
-    assert require_username({"CLAUDE_USERNAME": "user@example.com"}) == "user@example.com"
+    assert (
+        require_username({"CLAUDE_USERNAME": "user@example.com"}) == "user@example.com"
+    )

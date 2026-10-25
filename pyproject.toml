@@ -8,6 +8,8 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
+    "opentelemetry-distro>=0.66b1",
+    "opentelemetry-exporter-otlp>=1.45.1",
     "playwright>=1.63.0",
 ]
 

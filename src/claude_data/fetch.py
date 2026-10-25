@@ -126,3 +126,4 @@ def fetch_all(
         else:
             failed.append(ref.uuid)
     return FetchReport(fetched=fetched, failed=failed, skipped=skipped)
+
