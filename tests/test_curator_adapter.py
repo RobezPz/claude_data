@@ -1,4 +1,4 @@
-from curator_fixtures import message, write_conversation
+from curator_fixtures import message, write_conversation  # pyrefly: ignore[missing-import]
 
 from claude_data.curator.adapters import ClaudeAdapter
 
