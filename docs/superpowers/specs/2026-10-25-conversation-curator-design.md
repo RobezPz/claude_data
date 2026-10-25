@@ -1,7 +1,7 @@
 # Conversation Curator — Design
 
 Date: 2026-10-25
-Status: Draft for review
+Status: Approved 2026-10-25
 Scope: A local, purpose-built web editor for curating archived LLM conversations.
 
 ## Intent

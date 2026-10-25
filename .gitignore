@@ -3,6 +3,9 @@
 # Generated conversation archive
 archive/
 
+# Curated collections and exports (user data)
+curated/
+
 # Virtual environments
 .venv
 
