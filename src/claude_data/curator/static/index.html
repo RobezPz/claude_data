@@ -24,7 +24,10 @@
       <aside class="pane library-pane">
         <div class="pane-header">
           <h2>Library</h2>
-          <span id="library-count" class="muted"></span>
+          <div class="library-header-actions">
+            <span id="library-count" class="muted"></span>
+            <button id="add-selected" type="button" disabled>Add selected</button>
+          </div>
         </div>
         <div id="library" class="library-list"></div>
       </aside>
@@ -33,10 +36,17 @@
           <h2 id="collection-title">Collections</h2>
           <div class="collection-actions">
             <select id="collection-select" aria-label="Collection"></select>
-            <button id="new-collection" type="button" disabled title="Editing arrives in the next step">
-              New
-            </button>
+            <button id="new-collection" type="button">New</button>
+            <button id="rename-collection" type="button">Rename</button>
+            <button id="delete-collection" type="button">Delete</button>
           </div>
+        </div>
+        <div class="collection-toolbar">
+          <button id="sort-date" type="button">Sort by date</button>
+          <button id="split-here" type="button" disabled>Split here</button>
+          <select id="merge-source" aria-label="Merge collection"></select>
+          <button id="merge-collection" type="button" disabled>Merge</button>
+          <button id="export-collection" type="button" disabled>Export</button>
         </div>
         <div id="collections" class="collection-list"></div>
         <div id="collection-empty" class="empty">Select a collection to see its pairs.</div>

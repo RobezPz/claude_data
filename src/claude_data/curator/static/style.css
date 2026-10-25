@@ -245,6 +245,7 @@ button:focus-visible {
   display: flex;
   align-items: center;
   gap: 0.35rem;
+  flex-wrap: wrap;
 }
 
 #collection-select {
@@ -373,6 +374,72 @@ button:focus-visible {
   padding: 0.7rem 0.9rem;
   box-shadow: var(--shadow);
   z-index: 10;
+}
+
+.error-banner button {
+  margin-left: 0.5rem;
+}
+
+.library-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.collection-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background: #fbfcfd;
+}
+
+.collection-toolbar select {
+  max-width: 150px;
+}
+
+.collection-item {
+  position: relative;
+}
+
+.collection-item.selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.collection-item.dragover {
+  outline: 2px dashed var(--accent);
+  outline-offset: -3px;
+}
+
+.collection-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.collection-item-actions button {
+  padding: 0.05rem 0.35rem;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.drag-handle {
+  cursor: grab;
+  color: var(--muted);
+  padding-right: 0.2rem;
+  user-select: none;
+}
+
+.pair-check {
+  margin: 0 0.15rem 0 0;
+}
+
+.pair-row.dragover {
+  outline: 2px dashed var(--accent);
+  outline-offset: -3px;
 }
 
 @media (max-width: 1150px) {
