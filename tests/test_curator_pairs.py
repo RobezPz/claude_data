@@ -1,5 +1,10 @@
 from claude_data.curator.model import Message, Source
-from claude_data.curator.pairs import active_path, build_pairs, message_text, preview_text
+from claude_data.curator.pairs import (
+    active_path,
+    build_pairs,
+    message_text,
+    preview_text,
+)
 
 
 def msg(uuid, sender, index, parent=None, text="", created="2026-01-01T00:00:00Z"):
