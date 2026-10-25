@@ -13,6 +13,7 @@ def test_parse_args_defaults():
     assert ns.force is False
     assert ns.dry_run is False
     assert ns.show_browser is False
+    assert ns.command is None
 
 
 def test_parse_args_show_browser():
