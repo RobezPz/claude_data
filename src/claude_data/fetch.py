@@ -54,10 +54,15 @@ _FETCH_TREE_JS = """async ({org, uuid}) => {
 }"""
 
 
+def read_org(page: Page) -> str | None:
+    value = page.evaluate(_READ_ORG_JS, _ORG_COOKIE)
+    return value if isinstance(value, str) else None
+
+
 def capture_payload(page: Page, uuid: str) -> dict | None:
     if not page.url.startswith("https://claude.ai"):
         page.goto(CHATS_URL, wait_until="domcontentloaded")
-    org = page.evaluate(_READ_ORG_JS, _ORG_COOKIE)
+    org = read_org(page)
     if not org:
         return None
     result = page.evaluate(_FETCH_TREE_JS, {"org": org, "uuid": uuid})

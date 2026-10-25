@@ -18,6 +18,14 @@ def media_path(root: Path, filename: str) -> Path:
     return root / "media" / filename
 
 
+def file_path(root: Path, conversation: str, filename: str) -> Path:
+    return root / "files" / conversation / filename
+
+
+def artifact_path(root: Path, conversation: str, filename: str) -> Path:
+    return root / "artifacts" / conversation / filename
+
+
 def atomic_write_bytes(path: Path, data: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
@@ -40,6 +48,20 @@ def list_archived(root: Path) -> set[str]:
         for p in conversations.glob("*.json")
         if not p.name.endswith(".meta.json")
     }
+
+
+def load_archived(root: Path, only: str | None = None) -> list[tuple[str, dict]]:
+    conversations = root / "conversations"
+    if not conversations.is_dir():
+        return []
+    loaded: list[tuple[str, dict]] = []
+    for path in sorted(conversations.glob("*.json")):
+        if path.name.endswith(".meta.json"):
+            continue
+        if only is not None and path.stem != only:
+            continue
+        loaded.append((path.stem, json.loads(path.read_text())))
+    return loaded
 
 
 def extract_metadata(payload: dict) -> dict:
@@ -71,6 +93,11 @@ def build_manifest(root: Path) -> dict:
                 "source_url": CONVERSATION_SOURCE_URL.format(uuid=uuid),
                 "media": sidecar.get("media", {}),
                 "media_failures": sidecar.get("media_failures", []),
+                "files": sidecar.get("files", {}),
+                "file_failures": sidecar.get("file_failures", []),
+                "artifacts": sidecar.get("artifacts", {}),
+                "generated": sidecar.get("generated", []),
+                "generated_failures": sidecar.get("generated_failures", []),
             }
         )
     return {

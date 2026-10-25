@@ -149,3 +149,27 @@ No other flags.
   `--refresh`).
 - Scheduling, multi-account support, headless operation (Cloudflare-blocked;
   would need a stealth browser build).
+
+## Amendment (2026-10-25): on-demand files
+
+The original design deferred uploaded files. Two on-demand passes now operate
+on the existing archive without re-enumerating conversations:
+
+- `--download-files [--max-size-mb N] [--conversation UUID] [--force] [--dry-run]`
+  downloads uploaded `files[]` images/PDFs and assistant `present_files` zips.
+- `--export-artifacts [--conversation UUID] [--force] [--dry-run]` exports
+  inline `artifacts` tool content; it needs no browser or `.env`.
+
+Output additions: `archive/files/{uuid}/`, `archive/generated/{uuid}/files-N.zip`,
+and `archive/artifacts/{uuid}/`. `files[]` entries gain `local_path` while
+retaining their remote URLs. `index.json` gains `files`, `file_failures`,
+`artifacts`, `generated`, and `generated_failures`.
+
+Uploaded images expose only WebP previews (~952 px median; `/original`,
+`/content`, and `/download` are 404), so previews are archived. Document entries
+expose the original PDF via `document_pdf`. `blob` uploads and `SendUserFile`
+deliveries have no working download endpoint and are recorded as unavailable.
+`present_files` batches come from
+`/api/organizations/{org}/conversations/{uuid}/wiggle/download-files?paths=...`
+as zips; batches are capped at ~8 paths, with a per-path fallback because one
+missing path aborts the whole batch.

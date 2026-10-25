@@ -30,6 +30,36 @@ def is_logged_in(page: Page) -> bool:
     return "/login" not in page.url
 
 
+def set_window_state(context: BrowserContext, page: Page, state: str) -> bool:
+    try:
+        session = context.new_cdp_session(page)
+    except Exception:  # noqa: BLE001 - window controls are best-effort
+        return False
+    try:
+        info = session.send("Browser.getWindowForTarget")
+        window_id = info.get("windowId") if isinstance(info, dict) else None
+        if window_id is None:
+            return False
+        session.send(
+            "Browser.setWindowBounds",
+            {"windowId": window_id, "bounds": {"windowState": state}},
+        )
+    except Exception:  # noqa: BLE001 - window controls are best-effort
+        return False
+    finally:
+        with contextlib.suppress(Exception):
+            session.detach()
+    return True
+
+
+def minimize(context: BrowserContext, page: Page) -> bool:
+    return set_window_state(context, page, "minimized")
+
+
+def restore(context: BrowserContext, page: Page) -> bool:
+    return set_window_state(context, page, "normal")
+
+
 class ResponseCapture:
     def __init__(self, pattern: str) -> None:
         self._pattern = re.compile(pattern)

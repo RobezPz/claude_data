@@ -18,6 +18,36 @@ def test_build_manifest_from_disk(tmp_path):
             {
                 "media": {"https://cdn.example.com/f/1.png": "media/1.png"},
                 "media_failures": ["https://cdn.example.com/f/2.png"],
+                "files": {
+                    "file-1": {
+                        "file_name": "photo.png",
+                        "kind": "image",
+                        "path": "files/conv-1/file-1-photo.webp",
+                        "status": "downloaded",
+                    }
+                },
+                "file_failures": [{"file_uuid": "blob-1", "reason": "no URL"}],
+                "artifacts": {
+                    "demo": {
+                        "path": "artifacts/conv-1/demo.py",
+                        "status": "downloaded",
+                    }
+                },
+                "generated": [
+                    {
+                        "path": "generated/conv-1/files-1.zip",
+                        "status": "downloaded",
+                        "file_count": 2,
+                        "source_paths": ["/out/a.py", "/out/b.py"],
+                    }
+                ],
+                "generated_failures": [
+                    {
+                        "conversation": "conv-1",
+                        "paths": ["/out/c.py"],
+                        "reason": "boom",
+                    }
+                ],
             }
         )
     )
@@ -40,12 +70,47 @@ def test_build_manifest_from_disk(tmp_path):
         "source_url": f"https://claude.ai/chat/{uuid}",
         "media": {"https://cdn.example.com/f/1.png": "media/1.png"},
         "media_failures": ["https://cdn.example.com/f/2.png"],
+        "files": {
+            "file-1": {
+                "file_name": "photo.png",
+                "kind": "image",
+                "path": "files/conv-1/file-1-photo.webp",
+                "status": "downloaded",
+            }
+        },
+        "file_failures": [{"file_uuid": "blob-1", "reason": "no URL"}],
+        "artifacts": {
+            "demo": {
+                "path": "artifacts/conv-1/demo.py",
+                "status": "downloaded",
+            }
+        },
+        "generated": [
+            {
+                "path": "generated/conv-1/files-1.zip",
+                "status": "downloaded",
+                "file_count": 2,
+                "source_paths": ["/out/a.py", "/out/b.py"],
+            }
+        ],
+        "generated_failures": [
+            {
+                "conversation": "conv-1",
+                "paths": ["/out/c.py"],
+                "reason": "boom",
+            }
+        ],
     }
     bare = next(
         e for e in manifest["conversations"] if e["uuid"] == "1a59ff1e-dae3-5633-bead-42e1f40eb371"
     )
     assert bare["media"] == {}
     assert bare["media_failures"] == []
+    assert bare["files"] == {}
+    assert bare["file_failures"] == []
+    assert bare["artifacts"] == {}
+    assert bare["generated"] == []
+    assert bare["generated_failures"] == []
     generated_at = manifest["generated_at"]
     parsed = datetime.fromisoformat(generated_at)
     assert parsed.utcoffset() is not None
