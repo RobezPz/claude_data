@@ -1,5 +1,7 @@
 import zipfile
 
+import pytest
+
 from claude_data.curator.export import copy_assets, export_collection, rewrite_links
 from claude_data.curator.model import Asset, Collection, CollectionItem
 
@@ -28,6 +30,16 @@ def test_export_zip_contains_bundle(
         names = archive.namelist()
     assert any(name.endswith("collection.md") for name in names)
     assert any("/assets/" in name for name in names)
+
+
+def test_export_encodes_spaces_in_markdown_asset_links(
+    tmp_path, curator_archive, curator_library, curator_collection
+):
+    result = export_collection(
+        curator_collection, curator_library, curator_archive, tmp_path / "exports"
+    )
+    markdown = (result.folder / "collection.md").read_text()
+    assert "%20" in markdown
 
 
 def test_export_missing_pair_placeholder(tmp_path, curator_archive, curator_library):
@@ -66,3 +78,16 @@ def test_rewrite_links_uses_export_paths():
         rewrite_links("![x](media/a.png)", {"media/a.png": "assets/abc-a.png"})
         == "![x](assets/abc-a.png)"
     )
+
+
+def test_export_refuses_unsafe_collection_id(tmp_path):
+    collection = Collection(
+        collection_id="..",
+        title="Unsafe",
+        description="",
+        items=[],
+        created_at="2026-01-01T00:00:00Z",
+        updated_at="2026-01-01T00:00:00Z",
+    )
+    with pytest.raises(ValueError):
+        export_collection(collection, None, tmp_path, tmp_path / "exports")

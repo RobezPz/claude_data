@@ -89,7 +89,7 @@ Pair
   date            ISO-8601 UTC from the human message
   question_text   plain-text preview (bounded)
   answer_text     plain-text preview (bounded)
-  has_branches    true when the active path passes a branched message
+  has_branches    true when any message in the pair has more than one child
   missing_answer  true when no assistant message follows
   assets          list of Asset references
 
@@ -199,8 +199,8 @@ more than one child on the active path, and 2 lack a
   `missing_answer = true`.
 - `date` is the human message `created_at`, normalized to UTC. If missing, use
   the conversation `created_at`, then the Unix epoch.
-- `has_branches` is true if any message on the active path has more than one
-  child in the full payload.
+- `has_branches` is true if any message in the pair has more than one child in
+  the full payload.
 - Text previews concatenate `content[].text` for `text` blocks, falling back to
   the message `text` field, trimmed and bounded (approximately 200 characters).
 - Tool calls/results, thinking, images, attachments, and files remain in the

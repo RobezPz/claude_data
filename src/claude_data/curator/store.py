@@ -1,5 +1,6 @@
 import fcntl
 import json
+import re
 import shutil
 from contextlib import contextmanager
 from dataclasses import asdict
@@ -64,8 +65,8 @@ def _parse_collection(raw: object) -> Collection:
 def validate_collections(collections: list[Collection]) -> None:
     ids: set[str] = set()
     for collection in collections:
-        if not collection.collection_id:
-            raise ValueError("collection_id is required")
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", collection.collection_id):
+            raise ValueError(f"invalid collection id: {collection.collection_id!r}")
         if collection.collection_id in ids:
             raise ValueError(f"duplicate collection id: {collection.collection_id}")
         ids.add(collection.collection_id)

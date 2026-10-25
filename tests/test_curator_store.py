@@ -57,6 +57,12 @@ def test_validate_rejects_duplicate_ids_and_empty_title():
         validate_collections([coll(title="")])
 
 
+@pytest.mark.parametrize("collection_id", ["..", "a/b", ".hidden", ""])
+def test_validate_rejects_unsafe_collection_ids(collection_id):
+    with pytest.raises(ValueError):
+        validate_collections([coll(cid=collection_id)])
+
+
 def test_validate_allows_unresolved_pair():
     validate_collections([coll()])
 

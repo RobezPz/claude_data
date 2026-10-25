@@ -1,5 +1,6 @@
 import html
 import json
+import re
 from dataclasses import asdict
 
 import bleach
@@ -49,6 +50,11 @@ ALLOWED_ATTRIBUTES = {
     "span": ["class"],
 }
 
+_REMOTE_IMAGE = re.compile(
+    r"""<img\b[^>]*\bsrc=["']https?://[^"']*["'][^>]*>""",
+    re.IGNORECASE,
+)
+
 
 def _rewrite_local_links(text: str, link_prefix: str) -> str:
     for prefix in LOCAL_PREFIXES:
@@ -61,28 +67,55 @@ def _rewrite_local_links(text: str, link_prefix: str) -> str:
 def render_markdown(text: str, link_prefix: str = "/assets/") -> str:
     text = _rewrite_local_links(text, link_prefix)
     rendered = markdown.markdown(text, extensions=["fenced_code", "tables"])
-    return bleach.clean(
+    cleaned = bleach.clean(
         rendered,
         tags=ALLOWED_TAGS,
         attributes=ALLOWED_ATTRIBUTES,
         protocols=["http", "https", "mailto"],
         strip=True,
     )
+    return _REMOTE_IMAGE.sub(
+        '<span class="asset-note">[remote image]</span>', cleaned
+    )
 
 
 def _block_text(block: dict) -> str:
-    if isinstance(block.get("text"), str):
-        return block["text"]
-    if isinstance(block.get("thinking"), str):
-        return block["thinking"]
+    for key in ("text", "thinking", "summary"):
+        value = block.get(key)
+        if isinstance(value, str) and value.strip():
+            return value
     content = block.get("content")
     if isinstance(content, list):
-        return " ".join(
-            item["text"]
-            for item in content
-            if isinstance(item, dict) and isinstance(item.get("text"), str)
-        )
-    return ""
+        parts: list[str] = []
+        for item in content:
+            if not isinstance(item, dict):
+                continue
+            if isinstance(item.get("text"), str) and item["text"].strip():
+                parts.append(item["text"].strip())
+            elif isinstance(item.get("summary"), str) and item["summary"].strip():
+                parts.append(item["summary"].strip())
+            elif item.get("title") or item.get("url"):
+                parts.append(
+                    " ".join(
+                        str(value)
+                        for value in (item.get("title"), item.get("url"))
+                        if value
+                    )
+                )
+        if parts:
+            return " ".join(parts)
+    summaries = block.get("summaries")
+    if isinstance(summaries, list):
+        parts = [
+            str(item["summary"])
+            for item in summaries
+            if isinstance(item, dict)
+            and isinstance(item.get("summary"), str)
+            and item["summary"].strip()
+        ]
+        if parts:
+            return " ".join(parts)
+    return json.dumps(block, ensure_ascii=False)
 
 
 def _details(summary: str, text: str) -> str:
@@ -114,6 +147,15 @@ def render_message(message: Message, link_prefix: str = "/assets/") -> str:
             parts.append('<span class="asset-note">[image]</span>')
         else:
             parts.append(_details(str(kind or "block"), json.dumps(block, ensure_ascii=False)))
+    for attachment in message.attachments or []:
+        if not isinstance(attachment, dict):
+            continue
+        name = str(attachment.get("file_name") or "attachment")
+        extracted = attachment.get("extracted_content")
+        if isinstance(extracted, str) and extracted.strip():
+            parts.append(_details(f"Attachment: {name}", extracted))
+        else:
+            parts.append(f'<p class="asset-note">Attachment: {html.escape(name)}</p>')
     return "".join(parts)
 
 

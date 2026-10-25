@@ -201,6 +201,15 @@ button:focus-visible {
   white-space: nowrap;
 }
 
+.pair-source {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .badge {
   display: inline-flex;
   align-items: center;
@@ -384,6 +393,7 @@ button:focus-visible {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .collection-toolbar {

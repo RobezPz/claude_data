@@ -70,4 +70,4 @@ Python >= 3.13, src layout, `uv_build` backend, single package `claude_data`; de
 
 ## Status (2026-10-25)
 
-130 tests pass; ruff and pyrefly are clean. The local archive holds 348 conversations / 3,371 messages / ~157 MB, including 93 uploaded files (92 WebP previews + 1 PDF; 8 blobs unavailable), 19 exported artifacts, and 55 generated-file zips. The curator derives 1,653 Q&A pairs and serves them through `uv run claude-data view`. Implementation plans: `docs/superpowers/plans/2026-10-04-claude-conversation-archiver.md` and `docs/superpowers/plans/2026-10-25-conversation-curator.md`.
+147 tests pass; ruff and pyrefly are clean. The local archive holds 348 conversations / 3,371 messages / ~157 MB, including 93 uploaded files (92 WebP previews + 1 PDF; 8 blobs unavailable), 19 exported artifacts, and 55 generated-file zips. The curator derives 1,653 Q&A pairs and serves them through `uv run claude-data view`. Implementation plans: `docs/superpowers/plans/2026-10-04-claude-conversation-archiver.md` and `docs/superpowers/plans/2026-10-25-conversation-curator.md`.

@@ -8,6 +8,7 @@ import zipfile
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from urllib.parse import quote
 
 from claude_data.curator.library import Library
 from claude_data.curator.model import Asset, Collection, Pair
@@ -95,7 +96,7 @@ def _asset_links_markdown(
     for asset in assets:
         path = mapping.get(asset.asset_id)
         if path:
-            lines.append(f"- [{asset.label}]({path})")
+            lines.append(f"- [{asset.label}]({quote(path, safe='/')})")
         else:
             lines.append(f"- {asset.label} (unavailable)")
     return lines
@@ -109,7 +110,8 @@ def _asset_links_html(assets: list[Asset], mapping: dict[str, str]) -> str:
         path = mapping.get(asset.asset_id)
         label = html.escape(asset.label)
         if path:
-            items.append(f'<li><a href="{html.escape(path)}">{label}</a></li>')
+            href = html.escape(quote(path, safe="/"))
+            items.append(f'<li><a href="{href}">{label}</a></li>')
         else:
             items.append(f"<li>{label} (unavailable)</li>")
     return '<h3 class="meta">Attachments</h3><ul>' + "".join(items) + "</ul>"
@@ -132,14 +134,16 @@ def export_collection(
     archive_root: Path,
     out_dir: Path,
 ) -> ExportResult:
-    out_dir = Path(out_dir)
+    out_dir = Path(out_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
+    final = (out_dir / collection.collection_id).resolve()
+    if not final.is_relative_to(out_dir):
+        raise ValueError("collection id escapes the export directory")
     temp = Path(
         tempfile.mkdtemp(prefix=f".{collection.collection_id}-", dir=out_dir)
     )
     assets_dir = temp / "assets"
     assets_dir.mkdir()
-    final = out_dir / collection.collection_id
     try:
         resolved: list[tuple[object, tuple[Pair, list] | None]] = []
         all_assets: dict[str, Asset] = {}

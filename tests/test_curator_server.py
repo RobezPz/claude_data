@@ -105,3 +105,44 @@ def test_unknown_path_404(server):
     with pytest.raises(urllib.error.HTTPError) as exc:
         urllib.request.urlopen(f"{url}/api/nope")
     assert exc.value.code == 404
+
+
+def test_state_rejects_unsafe_collection_id(server, curator_collection):
+    _, url = server
+    state = get_json(f"{url}/api/state")
+    collection = asdict(curator_collection)
+    collection["collection_id"] = "../evil"
+    with pytest.raises(urllib.error.HTTPError) as exc:
+        put_json(
+            f"{url}/api/state",
+            {
+                "expected_revision": state["revision"],
+                "collections": [collection],
+            },
+        )
+    assert exc.value.code == 400
+
+
+def test_state_rejects_bad_json(server):
+    _, url = server
+    request = urllib.request.Request(
+        f"{url}/api/state",
+        data=b"{bad",
+        method="PUT",
+        headers={"Content-Type": "application/json"},
+    )
+    with pytest.raises(urllib.error.HTTPError) as exc:
+        urllib.request.urlopen(request)
+    assert exc.value.code == 400
+
+
+def test_malformed_state_returns_json_error(server, tmp_path):
+    _, url = server
+    data_dir = tmp_path / "curated"
+    data_dir.mkdir(exist_ok=True)
+    (data_dir / "collections.json").write_text("{bad")
+    with pytest.raises(urllib.error.HTTPError) as exc:
+        urllib.request.urlopen(f"{url}/api/state")
+    assert exc.value.code == 500
+    body = json.loads(exc.value.read())
+    assert "collections.json.bak" in body["error"]

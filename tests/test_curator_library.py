@@ -98,3 +98,19 @@ def test_reconcile_keeps_missing_item(tmp_path):
     )
     reconciled = library.reconcile([collection])
     assert reconciled[0].items[0].pair_id == "gone"
+
+
+def test_reconcile_relinks_by_date_and_preview_prefix(tmp_path):
+    library = make_library(tmp_path)
+    old = library.pairs[0]
+    collection = make_collection(
+        item(
+            pair_id="missing",
+            source_id=old.source_id,
+            question_uuid="wrong-uuid",
+            date=old.date,
+            preview=old.question_text[:10],
+        )
+    )
+    reconciled = library.reconcile([collection])
+    assert reconciled[0].items[0].pair_id == old.pair_id

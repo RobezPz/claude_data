@@ -23,7 +23,7 @@ def curator_archive(tmp_path):
                 "files": [
                     {
                         "file_uuid": "f1",
-                        "file_name": "photo.png",
+                        "file_name": "screen shot.png",
                         "file_kind": "image",
                         "local_path": "files/conv-1/photo.webp",
                     }

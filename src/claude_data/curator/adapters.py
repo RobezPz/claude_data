@@ -24,15 +24,6 @@ def _short_hash(value: str) -> str:
     return hashlib.sha1(value.encode("utf-8")).hexdigest()[:12]
 
 
-def _text(content: list[dict]) -> str:
-    parts = [
-        block.get("text", "")
-        for block in content
-        if isinstance(block, dict) and block.get("type") == "text"
-    ]
-    return " ".join(part for part in parts if isinstance(part, str))
-
-
 def _message_assets(
     raw: dict,
     content: list[dict],
@@ -61,9 +52,9 @@ def _message_assets(
             message_uuid=message_uuid,
         )
 
-    text = _text(content)
+    searchable = json.dumps(raw, ensure_ascii=False)
     for url, local_path in (meta.get("media") or {}).items():
-        if url not in text:
+        if url not in searchable and local_path not in searchable:
             continue
         assets[f"media:{source_id}:{_short_hash(url)}"] = Asset(
             asset_id=f"media:{source_id}:{_short_hash(url)}",

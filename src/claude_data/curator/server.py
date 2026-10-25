@@ -137,7 +137,15 @@ class CuratorHandler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/state":
-            state = load_state(self.server.data_dir)
+            try:
+                state = load_state(self.server.data_dir)
+            except (StoreError, OSError) as exc:
+                self._error(
+                    500,
+                    f"cannot read collections.json: {exc}; "
+                    "restore from collections.json.bak",
+                )
+                return
             collections = self.server.library.reconcile(state.collections)
             self._send_json(
                 {
@@ -149,7 +157,15 @@ class CuratorHandler(BaseHTTPRequestHandler):
 
         if path.startswith(API_PREFIX + "export/") and path.endswith(".zip"):
             collection_id = path[len(API_PREFIX + "export/") : -4]
-            state = load_state(self.server.data_dir)
+            try:
+                state = load_state(self.server.data_dir)
+            except (StoreError, OSError) as exc:
+                self._error(
+                    500,
+                    f"cannot read collections.json: {exc}; "
+                    "restore from collections.json.bak",
+                )
+                return
             collections = self.server.library.reconcile(state.collections)
             collection = next(
                 (

@@ -22,11 +22,27 @@ def message_text(message: Message) -> str:
         text = block.get("text")
         if isinstance(text, str) and text.strip():
             parts.append(text.strip())
+    for attachment in message.attachments or []:
+        if not isinstance(attachment, dict):
+            continue
+        name = str(attachment.get("file_name") or "attachment")
+        extracted = attachment.get("extracted_content")
+        if isinstance(extracted, str) and extracted.strip():
+            parts.append(f"[Attachment: {name}]\n\n{extracted.strip()}")
+        else:
+            parts.append(f"[Attachment: {name}]")
     return " ".join(parts)
 
 
 def preview_text(message: Message, limit: int = 200) -> str:
     return message_text(message)[:limit]
+
+
+def _index_order(messages: list[Message]) -> list[Message]:
+    return sorted(
+        messages,
+        key=lambda message: (message.index, message.created_at, message.external_id),
+    )
 
 
 def active_path(
@@ -37,24 +53,20 @@ def active_path(
         path: list[Message] = []
         seen: set[str] = set()
         current = by_uuid[leaf_uuid]
-        fallback = False
         while True:
             if current.external_id in seen:
-                fallback = True
-                break
+                return _index_order(messages), True
             path.append(current)
             seen.add(current.external_id)
             parent = current.parent_id
             if parent in (None, "", ROOT_PARENT_UUID):
                 break
             if parent not in by_uuid:
-                fallback = True
-                break
+                return _index_order(messages), True
             current = by_uuid[parent]
         path.reverse()
-        return path, fallback
-    ordered = sorted(messages, key=lambda message: (message.index, message.created_at, message.external_id))
-    return ordered, True
+        return path, False
+    return _index_order(messages), True
 
 
 def _dedupe_assets(assets: list[Asset]) -> list[Asset]:

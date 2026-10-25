@@ -126,6 +126,7 @@ function filteredPairs() {
 function updateAddSelected() {
   $("add-selected").disabled =
     state.selectedPairIds.size === 0 || currentCollection() === null;
+  $("new-from-selection").disabled = state.selectedPairIds.size === 0;
 }
 
 function renderLibrary() {
@@ -185,6 +186,11 @@ function renderLibrary() {
     meta.appendChild(date);
     const source = sourceById(pair.source_id);
     meta.appendChild(makeBadge(source ? source.provider : "source", "badge provider"));
+    const sourceLabel = document.createElement("span");
+    sourceLabel.className = "pair-source";
+    sourceLabel.textContent = sourceTitle(pair.source_id);
+    sourceLabel.title = pair.source_id;
+    meta.appendChild(sourceLabel);
     if (pair.has_branches) meta.appendChild(makeBadge("branches", "badge warn"));
     if (pair.missing_answer) meta.appendChild(makeBadge("no answer", "badge warn"));
 
@@ -231,6 +237,7 @@ function updateToolbar() {
   const hasCollection = collection !== null;
   $("add-selected").disabled =
     state.selectedPairIds.size === 0 || !hasCollection;
+  $("new-from-selection").disabled = state.selectedPairIds.size === 0;
   $("sort-date").disabled = !hasCollection || collection.items.length === 0;
   $("split-here").disabled =
     !hasCollection || state.selectedItemIndex === null || collection.items.length === 0;
@@ -518,6 +525,35 @@ function newCollection() {
   scheduleSave();
 }
 
+function newCollectionFromSelection() {
+  const selected = [...state.selectedPairIds]
+    .map((pairId) => pairById(pairId))
+    .filter(Boolean)
+    .sort((left, right) => (left.date < right.date ? -1 : 1));
+  if (!selected.length) return;
+  const title = window.prompt("New collection title");
+  if (!title || !title.trim()) return;
+  const now = new Date().toISOString();
+  const collection = {
+    collection_id:
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `c-${Date.now()}`,
+    title: title.trim(),
+    description: "",
+    items: selected.map(collectionItem),
+    created_at: now,
+    updated_at: now,
+  };
+  state.collections.push(collection);
+  state.currentCollectionId = collection.collection_id;
+  state.selectedItemIndex = null;
+  state.selectedPairIds.clear();
+  renderLibrary();
+  renderCollections();
+  scheduleSave();
+}
+
 function renameCollection() {
   const collection = currentCollection();
   if (!collection) return;
@@ -653,7 +689,7 @@ function sortByDate() {
   scheduleSave();
 }
 
-function exportCollection() {
+async function exportCollection() {
   const collection = currentCollection();
   if (!collection) return;
   const hasAssets = collection.items.some((item) => {
@@ -667,6 +703,20 @@ function exportCollection() {
     )
   ) {
     return;
+  }
+  const hadPending = Boolean(saveTimer) || state.saving || state.pendingSave;
+  clearTimeout(saveTimer);
+  saveTimer = null;
+  if (hadPending) {
+    for (let attempt = 0; attempt < 5 && state.saving; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+    if (state.saving) {
+      showError("A save is still in progress; try exporting again.");
+      return;
+    }
+    const saved = await saveState();
+    if (!saved) return;
   }
   window.location.href = `/api/export/${encodeURIComponent(collection.collection_id)}.zip`;
 }
@@ -715,16 +765,20 @@ function handleDrop(event, targetIndex) {
 function scheduleSave() {
   clearTimeout(saveTimer);
   setStatus("Unsaved changes");
-  saveTimer = setTimeout(saveState, 400);
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    saveState();
+  }, 400);
 }
 
 async function saveState() {
   if (state.saving) {
     state.pendingSave = true;
-    return;
+    return false;
   }
   state.saving = true;
   setStatus("Saving…");
+  let saved = false;
   try {
     const payload = await fetchJSON("/api/state", {
       method: "PUT",
@@ -737,15 +791,16 @@ async function saveState() {
     state.revision = payload.revision;
     state.collections = payload.collections;
     setStatus("Saved");
+    saved = true;
   } catch (error) {
     if (error.status === 409) {
       setStatus("Conflict");
       showConflict();
       state.pendingSave = false;
-      return;
+    } else {
+      setStatus("Save failed");
+      showError(`Could not save: ${error.message}`);
     }
-    setStatus("Save failed");
-    showError(`Could not save: ${error.message}`);
   } finally {
     state.saving = false;
     if (state.pendingSave) {
@@ -753,6 +808,7 @@ async function saveState() {
       scheduleSave();
     }
   }
+  return saved;
 }
 
 async function reloadState() {
@@ -842,6 +898,7 @@ function bind() {
   $("rename-collection").addEventListener("click", renameCollection);
   $("delete-collection").addEventListener("click", deleteCollection);
   $("add-selected").addEventListener("click", addSelected);
+  $("new-from-selection").addEventListener("click", newCollectionFromSelection);
   $("sort-date").addEventListener("click", sortByDate);
   $("split-here").addEventListener("click", splitHere);
   $("merge-source").addEventListener("change", updateToolbar);

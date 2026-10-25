@@ -89,6 +89,23 @@ def test_asset_normalization_covers_all_kinds(tmp_path):
     assert bundle.source.assets == []
 
 
+def test_media_asset_matches_rewritten_local_path(tmp_path):
+    (tmp_path / "media").mkdir()
+    (tmp_path / "media" / "paper.pdf").write_bytes(b"x")
+    payload = {
+        "uuid": "conv-1",
+        "chat_messages": [
+            message("h1", "human", 0, text="see media/paper.pdf")
+        ],
+        "current_leaf_message_uuid": "h1",
+    }
+    meta = {"media": {"https://example.com/a.pdf": "media/paper.pdf"}}
+    path = write_conversation(tmp_path, payload, meta)
+    bundle = ClaudeAdapter().load(path, tmp_path)
+    media = [asset for asset in bundle.messages[0].assets if asset.kind == "media"]
+    assert media and media[0].local_path == "media/paper.pdf"
+
+
 def test_unmatched_generated_zip_is_source_level(tmp_path):
     (tmp_path / "generated" / "conv-1").mkdir(parents=True)
     (tmp_path / "generated" / "conv-1" / "files-1.zip").write_bytes(b"x")

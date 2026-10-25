@@ -68,6 +68,26 @@ def test_active_path_falls_back_to_index_order():
     assert fallback is True
 
 
+def test_active_path_missing_parent_falls_back_to_index_order():
+    messages = [
+        msg("a1", "assistant", 1, parent="missing-parent"),
+        msg("h1", "human", 0),
+    ]
+    path, fallback = active_path(messages, "a1")
+    assert [m.external_id for m in path] == ["h1", "a1"]
+    assert fallback is True
+
+
+def test_active_path_cycle_falls_back_to_index_order():
+    messages = [
+        msg("h1", "human", 0, parent="a1"),
+        msg("a1", "assistant", 1, parent="h1"),
+    ]
+    path, fallback = active_path(messages, "a1")
+    assert [m.external_id for m in path] == ["h1", "a1"]
+    assert fallback is True
+
+
 def test_build_pairs_groups_answers_and_marks_missing():
     messages = [
         msg("h1", "human", 0, text="q1"),
@@ -107,3 +127,20 @@ def test_preview_text_joins_text_blocks_and_truncates():
     assert message_text(message) == "hello"
     assert preview_text(message, limit=5) == "hello"
     assert preview_text(message, limit=2) == "he"
+
+
+def test_message_text_includes_inline_attachment_content():
+    message = Message(
+        external_id="h1",
+        parent_id=None,
+        role="human",
+        created_at="2026-01-01T00:00:00Z",
+        index=0,
+        content=[],
+        attachments=[
+            {"file_name": "notes.txt", "extracted_content": "attachment body"}
+        ],
+        assets=[],
+    )
+    assert "notes.txt" in message_text(message)
+    assert "attachment body" in message_text(message)
