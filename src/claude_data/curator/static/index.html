@@ -2,10 +2,55 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Conversation Curator</title>
+    <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
-    <h1>Conversation Curator</h1>
-    <p>The frontend is being built.</p>
+    <header class="topbar">
+      <div class="brand">Conversation Curator</div>
+      <div class="topbar-controls">
+        <input id="search" type="search" placeholder="Search pairs…" autocomplete="off" />
+        <select id="source-filter" aria-label="Source filter">
+          <option value="">All sources</option>
+        </select>
+        <label class="date-filter">From <input id="date-from" type="date" /></label>
+        <label class="date-filter">To <input id="date-to" type="date" /></label>
+        <button id="reload" type="button">Reload library</button>
+        <span id="save-status" class="status" role="status">Loading…</span>
+      </div>
+    </header>
+    <main class="layout">
+      <aside class="pane library-pane">
+        <div class="pane-header">
+          <h2>Library</h2>
+          <span id="library-count" class="muted"></span>
+        </div>
+        <div id="library" class="library-list"></div>
+      </aside>
+      <section class="pane collection-pane">
+        <div class="pane-header">
+          <h2 id="collection-title">Collections</h2>
+          <div class="collection-actions">
+            <select id="collection-select" aria-label="Collection"></select>
+            <button id="new-collection" type="button" disabled title="Editing arrives in the next step">
+              New
+            </button>
+          </div>
+        </div>
+        <div id="collections" class="collection-list"></div>
+        <div id="collection-empty" class="empty">Select a collection to see its pairs.</div>
+      </section>
+      <aside class="pane preview-pane">
+        <div class="pane-header">
+          <h2>Preview</h2>
+          <span id="preview-meta" class="muted"></span>
+        </div>
+        <div id="preview" class="preview">
+          <p class="empty">Select a pair to preview it.</p>
+        </div>
+      </aside>
+    </main>
+    <script src="/app.js"></script>
   </body>
 </html>
