@@ -72,3 +72,9 @@ class Collection:
     items: list[CollectionItem]
     created_at: str
     updated_at: str
+
+
+@dataclass(frozen=True)
+class State:
+    revision: int
+    collections: list[Collection]

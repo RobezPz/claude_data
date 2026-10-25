@@ -5,6 +5,7 @@ from claude_data.curator.model import (
     Message,
     Pair,
     Source,
+    State,
 )
 from claude_data.curator.pairs import (
     PairBuild,
@@ -22,6 +23,7 @@ __all__ = [
     "Pair",
     "PairBuild",
     "Source",
+    "State",
     "active_path",
     "build_pairs",
     "message_text",
