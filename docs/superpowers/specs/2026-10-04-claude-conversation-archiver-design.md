@@ -178,3 +178,34 @@ deliveries have no working download endpoint and are recorded as unavailable.
 `/api/organizations/{org}/conversations/{uuid}/wiggle/download-files?paths=...`
 as zips; batches are capped at ~8 paths, with a per-path fallback because one
 missing path aborts the whole batch.
+
+## Amendment (2026-10-26): one `sync` command
+
+The on-demand passes above duplicated the launch/login/minimize block and made
+the common case (fetch new conversations, then their files) a two-step
+incantation. The CLI is now two peer subcommands mirroring `view`:
+
+- `claude-data sync [--login] [--refresh [UUID]] [--show-browser]
+  [--conversation UUID] [--max-size-mb N] [--force] [--dry-run]` — one browser
+  session drives every acquisition pass in order: launch and minimize, log in
+  if required, enumerate and fetch conversations plus their media, then
+  uploaded files and `present_files` zips, then export inline artifacts with
+  the browser closed, then rebuild `index.json`. Progress is reported as one
+  summary (conversations, files, generated, artifacts).
+- `claude-data view [--port PORT] [--archive PATH] [--data-dir PATH] [--open]` —
+  unchanged except that the browser is now opt-in via `--open`; the default is
+  server-only.
+
+`--download-files`, `--export-artifacts`, `--headed`, and `view --no-browser`
+are removed. A bare `claude-data` is a usage error naming both commands, and
+each command rejects the other's flags. `--conversation` still scopes only the
+file/generated/artifact passes; `--refresh` now composes with them because
+every `sync` runs them. `--dry-run` never launches a browser or writes: it
+plans the file/generated/artifact passes from the existing archive, so it is
+mutually exclusive with `--login` and `--refresh`. Exit codes: 0 clean, 1 if
+any conversation/file/generated pass failed (or `lastActiveOrg` is unreadable),
+2 for configuration errors (missing `CLAUDE_USERNAME`, unknown
+`--conversation`).
+
+All writes stay atomic and skip-if-present; `--force` overwrites. The
+`GET`-only rules from the 2026-10-25 amendment still apply.

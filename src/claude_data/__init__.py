@@ -1,7 +1,9 @@
 import argparse
 import sys
 from collections import Counter
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from claude_data.archiver.artifacts import process_archived_artifacts
 from claude_data.archiver.browser import is_logged_in, launch, minimize, restore
@@ -35,24 +37,22 @@ CONSECUTIVE_CAPTURE_FAILURES_ABORT = 5
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="claude-data",
-        description="Archive Claude.ai conversations for offline viewing.",
+        description=(
+            "Archive Claude.ai conversations and their files ('sync') or browse "
+            "them locally ('view')."
+        ),
     )
     parser.add_argument(
         "command",
         nargs="?",
-        choices=["view"],
+        choices=["sync", "view"],
         default=None,
-        help="optional command; 'view' starts the local curator",
+        help="'sync' archives conversations and files; 'view' starts the curator",
     )
     parser.add_argument(
         "--login",
         action="store_true",
-        help="log in interactively before archiving",
-    )
-    parser.add_argument(
-        "--headed",
-        action="store_true",
-        help="accepted for compatibility; the browser always runs headed",
+        help="log in interactively before syncing",
     )
     parser.add_argument(
         "--refresh",
@@ -60,28 +60,18 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         const="all",
         default=None,
         metavar="UUID",
-        help="re-archive everything, or just the given conversation uuid",
+        help="re-fetch everything, or just the given conversation uuid",
     )
     parser.add_argument(
         "--show-browser",
         action="store_true",
-        help="keep the headed browser visible instead of minimizing it",
-    )
-    parser.add_argument(
-        "--download-files",
-        action="store_true",
-        help="download uploaded and generated files for archived conversations",
-    )
-    parser.add_argument(
-        "--export-artifacts",
-        action="store_true",
-        help="export inline artifact content for archived conversations",
+        help="keep the browser visible instead of minimizing it",
     )
     parser.add_argument(
         "--conversation",
         metavar="UUID",
         default=None,
-        help="limit --download-files/--export-artifacts to one conversation",
+        help="limit the file and artifact passes to one conversation",
     )
     parser.add_argument(
         "--max-size-mb",
@@ -98,7 +88,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="show planned downloads without writing anything",
+        help="show planned downloads without launching a browser or writing files",
     )
     parser.add_argument(
         "--port",
@@ -119,41 +109,39 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="curated data directory for view (default curated/)",
     )
     parser.add_argument(
-        "--no-browser",
+        "--open",
         action="store_true",
-        help="do not open a browser when starting view",
+        help="open the curator in a browser",
     )
     args = parser.parse_args(argv)
+    if args.command is None:
+        parser.error("choose a command: sync or view")
     if args.command == "view":
-        archive_flags = (
+        sync_flags = (
             args.login
-            or args.headed
             or args.refresh is not None
             or args.show_browser
-            or args.download_files
-            or args.export_artifacts
             or args.conversation is not None
             or args.max_size_mb != 0.0
             or args.force
             or args.dry_run
         )
-        if archive_flags:
-            parser.error("archive flags cannot be used with view")
+        if sync_flags:
+            parser.error("sync flags cannot be used with view")
         return args
     if (
         args.port is not None
         or args.archive is not None
         or args.data_dir is not None
-        or args.no_browser
+        or args.open
     ):
-        parser.error("--port/--archive/--data-dir/--no-browser require view")
-    file_mode = args.download_files or args.export_artifacts
-    if file_mode and args.refresh is not None:
-        parser.error("--refresh cannot be combined with --download-files/--export-artifacts")
-    if args.conversation and not file_mode:
-        parser.error("--conversation requires --download-files or --export-artifacts")
+        parser.error("--port/--archive/--data-dir/--open require view")
     if args.max_size_mb < 0:
         parser.error("--max-size-mb must be zero or positive")
+    if args.dry_run and args.login:
+        parser.error("--dry-run cannot be combined with --login")
+    if args.dry_run and args.refresh is not None:
+        parser.error("--dry-run cannot be combined with --refresh")
     return args
 
 
@@ -184,7 +172,12 @@ def _no_fetch_zip(conversation: str, paths: list[str]) -> Fetched:
     raise AssertionError(f"unexpected zip fetch during dry run: {conversation}")
 
 
-def _print_summary(file_results, artifact_results, generated_results, dry_run: bool) -> None:
+def _print_summary(report, file_results, artifact_results, generated_results, dry_run: bool) -> None:
+    if report is not None:
+        print(
+            f"conversations: fetched {len(report.fetched)}, "
+            f"skipped {report.skipped}, failed {len(report.failed)}"
+        )
     file_counts = Counter(result.status for result in file_results)
     artifact_counts = Counter(result.status for result in artifact_results)
     generated_counts = Counter(result.status for result in generated_results)
@@ -210,6 +203,8 @@ def _print_summary(file_results, artifact_results, generated_results, dry_run: b
                 f"{status} {count}" for status, count in sorted(artifact_counts.items())
             )
         )
+    if report is not None and report.failed:
+        print("failed uuids: " + ", ".join(report.failed), file=sys.stderr)
     issues = [
         result
         for result in file_results
@@ -235,139 +230,27 @@ def _print_summary(file_results, artifact_results, generated_results, dry_run: b
         )
 
 
-def run_file_tasks(args: argparse.Namespace) -> None:
-    conversations = load_archived(ARCHIVE_ROOT, args.conversation)
-    if args.conversation and not conversations:
-        print(
-            f"conversation not found in archive: {args.conversation}",
-            file=sys.stderr,
-        )
-        raise SystemExit(2)
-
-    max_bytes = int(args.max_size_mb * 1024 * 1024) if args.max_size_mb > 0 else None
-    file_results = []
-    artifact_results = []
-    generated_results = []
-
-    if args.download_files:
-        if args.dry_run:
-            file_results = process_archived_files(
-                ARCHIVE_ROOT,
-                conversations,
-                _no_fetch,
-                max_bytes=max_bytes,
-                force=args.force,
-                dry_run=True,
-            )
-            generated_results = process_archived_generated(
-                ARCHIVE_ROOT,
-                conversations,
-                _no_fetch_zip,
-                max_bytes=max_bytes,
-                force=args.force,
-                dry_run=True,
-            )
-        else:
-            context, page = _open_context(args.login, args.show_browser)
-            try:
-                org = read_org(page)
-                if not org:
-                    print(
-                        "could not read lastActiveOrg from the browser session",
-                        file=sys.stderr,
-                    )
-                    raise SystemExit(1)
-
-                def fetch(url: str) -> Fetched:
-                    response = context.request.get(url)
-                    if not response.ok:
-                        raise DownloadError(f"HTTP {response.status} for {url}")
-                    return Fetched(
-                        response.body(), response.headers.get("content-type")
-                    )
-
-                def fetch_zip(conversation: str, paths: list[str]) -> Fetched:
-                    response = context.request.get(
-                        generated_url(org, conversation, paths)
-                    )
-                    if not response.ok:
-                        raise DownloadError(
-                            f"HTTP {response.status} for generated files"
-                        )
-                    return Fetched(
-                        response.body(), response.headers.get("content-type")
-                    )
-
-                file_results = process_archived_files(
-                    ARCHIVE_ROOT,
-                    conversations,
-                    fetch,
-                    max_bytes=max_bytes,
-                    force=args.force,
-                )
-                generated_results = process_archived_generated(
-                    ARCHIVE_ROOT,
-                    conversations,
-                    fetch_zip,
-                    max_bytes=max_bytes,
-                    force=args.force,
-                )
-            finally:
-                context.close()
-
-    if args.export_artifacts:
-        artifact_results = process_archived_artifacts(
-            ARCHIVE_ROOT,
-            conversations,
-            force=args.force,
-            dry_run=args.dry_run,
-        )
-
-    if not args.dry_run:
-        atomic_write_json(ARCHIVE_ROOT / "index.json", build_manifest(ARCHIVE_ROOT))
-
-    _print_summary(file_results, artifact_results, generated_results, args.dry_run)
-    failed = any(
-        result.status == "failed"
-        for result in file_results + artifact_results + generated_results
-    )
-    raise SystemExit(1 if failed else 0)
+def _any_failed(report, *groups) -> bool:
+    if report is not None and report.failed:
+        return True
+    return any(result.status == "failed" for group in groups for result in group)
 
 
-def main() -> None:
-    args = parse_args()
-    if args.command == "view":
-        from claude_data.curator.server import serve
+def _fetch_request(context, url: str) -> Fetched:
+    response = context.request.get(url)
+    if not response.ok:
+        raise DownloadError(f"HTTP {response.status} for {url}")
+    return Fetched(response.body(), response.headers.get("content-type"))
 
-        serve(
-            archive_root=args.archive or ARCHIVE_ROOT,
-            data_dir=args.data_dir or Path("curated"),
-            port=args.port or 8765,
-            open_browser=not args.no_browser,
-        )
-        return
-    if args.download_files or args.export_artifacts:
-        run_file_tasks(args)
-        return
 
-    try:
-        username = require_username(read_env(Path(".env")))
-    except MissingUsernameError as exc:
-        print(f"{exc}", file=sys.stderr)
-        raise SystemExit(2) from exc
+def _fetch_generated(context, org: str, conversation: str, paths: list[str]) -> Fetched:
+    response = context.request.get(generated_url(org, conversation, paths))
+    if not response.ok:
+        raise DownloadError(f"HTTP {response.status} for generated files")
+    return Fetched(response.body(), response.headers.get("content-type"))
 
-    context = launch(headless=False)
-    page = context.new_page()
-    if not args.show_browser:
-        minimize(context, page)
-    logged_in = is_logged_in(page)
-    if args.login or not logged_in:
-        if not args.show_browser:
-            restore(context, page)
-        page = login(context, username)
-        if not args.show_browser:
-            minimize(context, page)
 
+def _sync_with_browser(context, page, args: argparse.Namespace, max_bytes: int | None):
     consecutive_failures = 0
 
     def capture(uuid: str) -> dict | None:
@@ -381,7 +264,6 @@ def main() -> None:
                     "re-run with --login",
                     file=sys.stderr,
                 )
-                context.close()
                 raise SystemExit(1) from None
         else:
             consecutive_failures = 0
@@ -391,7 +273,6 @@ def main() -> None:
     refresh_uuids = (
         frozenset({args.refresh}) if args.refresh not in (None, "all") else frozenset()
     )
-    force = args.refresh == "all"
     report = fetch_all(
         refs,
         root=ARCHIVE_ROOT,
@@ -401,17 +282,122 @@ def main() -> None:
             capture,
             lambda pairs: download_media(context, pairs, ARCHIVE_ROOT),
         ),
-        force=force,
+        force=args.refresh == "all",
         refresh_uuids=refresh_uuids,
     )
-    atomic_write_json(ARCHIVE_ROOT / "index.json", build_manifest(ARCHIVE_ROOT))
-    context.close()
-    print(
-        f"fetched {len(report.fetched)}, skipped {report.skipped}, failed {len(report.failed)}"
+    conversations = load_archived(ARCHIVE_ROOT, args.conversation)
+    org = read_org(page)
+    file_results = process_archived_files(
+        ARCHIVE_ROOT,
+        conversations,
+        lambda url: _fetch_request(context, url),
+        max_bytes=max_bytes,
+        force=args.force,
     )
-    if report.failed:
-        print("failed uuids: " + ", ".join(report.failed), file=sys.stderr)
-    raise SystemExit(1 if report.failed else 0)
+    generated_results = (
+        process_archived_generated(
+            ARCHIVE_ROOT,
+            conversations,
+            lambda conversation, paths: _fetch_generated(
+                context, org, conversation, paths
+            ),
+            max_bytes=max_bytes,
+            force=args.force,
+        )
+        if org
+        else []
+    )
+    return report, conversations, file_results, generated_results, org
 
 
-__all__ = ["CaptureError", "main", "parse_args"]
+def run_sync(
+    args: argparse.Namespace,
+    context_factory: Callable[[bool, bool], tuple[Any, Any]] = _open_context,
+) -> None:
+    if args.conversation is not None and not load_archived(
+        ARCHIVE_ROOT, args.conversation
+    ):
+        print(
+            f"conversation not found in archive: {args.conversation}",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+
+    max_bytes = int(args.max_size_mb * 1024 * 1024) if args.max_size_mb > 0 else None
+
+    if args.dry_run:
+        conversations = load_archived(ARCHIVE_ROOT, args.conversation)
+        file_results = process_archived_files(
+            ARCHIVE_ROOT,
+            conversations,
+            _no_fetch,
+            max_bytes=max_bytes,
+            force=args.force,
+            dry_run=True,
+        )
+        generated_results = process_archived_generated(
+            ARCHIVE_ROOT,
+            conversations,
+            _no_fetch_zip,
+            max_bytes=max_bytes,
+            force=args.force,
+            dry_run=True,
+        )
+        artifact_results = process_archived_artifacts(
+            ARCHIVE_ROOT,
+            conversations,
+            force=args.force,
+            dry_run=True,
+        )
+        _print_summary(None, file_results, artifact_results, generated_results, True)
+        failed = _any_failed(None, file_results, generated_results, artifact_results)
+        raise SystemExit(1 if failed else 0)
+
+    try:
+        context, page = context_factory(args.login, args.show_browser)
+    except MissingUsernameError as exc:
+        print(f"{exc}", file=sys.stderr)
+        raise SystemExit(2) from exc
+
+    try:
+        report, conversations, file_results, generated_results, org = _sync_with_browser(
+            context, page, args, max_bytes
+        )
+    finally:
+        context.close()
+
+    if not org:
+        print(
+            "could not read lastActiveOrg from the browser session; "
+            "generated files were not downloaded",
+            file=sys.stderr,
+        )
+    artifact_results = process_archived_artifacts(
+        ARCHIVE_ROOT,
+        conversations,
+        force=args.force,
+    )
+    atomic_write_json(ARCHIVE_ROOT / "index.json", build_manifest(ARCHIVE_ROOT))
+    _print_summary(report, file_results, artifact_results, generated_results, False)
+    failed = _any_failed(
+        report, file_results, generated_results, artifact_results
+    ) or not org
+    raise SystemExit(1 if failed else 0)
+
+
+def main() -> None:
+    args = parse_args()
+    if args.command == "view":
+        from claude_data.curator.server import serve
+
+        serve(
+            archive_root=args.archive or ARCHIVE_ROOT,
+            data_dir=args.data_dir or Path("curated"),
+            port=args.port or 8765,
+            open_browser=args.open,
+        )
+        return
+    run_sync(args)
+
+
+__all__ = ["CaptureError", "main", "parse_args", "run_sync"]

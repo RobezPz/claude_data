@@ -10,11 +10,9 @@
 - `uv run playwright install chromium` — one-time browser install for a fresh environment
 - `uv run pytest` — full suite (~5 s, no browser/network); single test: `uv run pytest tests/test_archiver_media.py::test_plan_downloads_skips_existing_and_dedupes`
 - `uvx ruff check` then `uvx pyrefly check` — required before commits; neither is a project dependency and neither has a config file. Pyrefly logs a "No pyrefly.toml" info line but exits 0 when clean (0 errors).
-- `uv run claude-data` — real archive run. Opens a **visible** browser and can block on an emailed-code login; never use it as part of automated verification. The window is minimized via CDP immediately after launch; `--show-browser` keeps it visible, and login/Cloudflare restores it automatically.
-- `uv run claude-data --login` / `--refresh [UUID]` — force re-auth / re-fetch all (bare) or one conversation. `--headed` is accepted but changes nothing.
-- `uv run claude-data --download-files [--max-size-mb N] [--conversation UUID] [--force] [--dry-run]` — download uploaded files and generated `present_files` zips from the **existing** archive. It scans `archive/conversations/*.json`; it does not re-enumerate conversations and only needs the headed browser for network access.
-- `uv run claude-data --export-artifacts [--conversation UUID] [--force] [--dry-run]` — export inline `artifacts` content; no browser or `.env` required. Both file commands can be combined.
-- `uv run claude-data view [--port 8765] [--archive archive] [--data-dir curated] [--no-browser]` — start the local conversation curator on `127.0.0.1` and open its web UI. It reads the archive read-only; collections live in `curated/collections.json`.
+- `uv run claude-data sync [--login] [--refresh [UUID]] [--show-browser] [--conversation UUID] [--max-size-mb N] [--force] [--dry-run]` — the real archive run: launches the **headed** browser (minimized via CDP), logs in if needed, enumerates and fetches conversations, then downloads their uploaded files and `present_files` zips in the same session, exports inline artifacts without the browser, and rebuilds `index.json`, printing one summary. It can block on an emailed-code login; never use it as part of automated verification. `--dry-run` never launches a browser or writes: it plans the file/generated/artifact passes from the existing archive.
+- Exit codes for `sync`: 0 clean, 1 if any conversation/file/generated pass failed, 2 for config errors (missing `CLAUDE_USERNAME`, unknown `--conversation`). A bare `claude-data` is a usage error naming both commands.
+- `uv run claude-data view [--port 8765] [--archive archive] [--data-dir curated] [--open]` — start the local conversation curator on `127.0.0.1`; `--open` launches a browser (the default is server-only). It reads the archive read-only; collections live in `curated/collections.json`.
 - In the curator: create topic collections, add/remove Q&A pairs across conversations, drag to reorder, date-sort, split at a pair, merge collections, and export a self-contained zip. Raw archive files are never modified.
 
 ## Toolchain
@@ -24,7 +22,7 @@ Python >= 3.13, src layout, `uv_build` backend, one distribution `claude_data` w
 ## Wiring
 
 - Entry point is `main()` in `src/claude_data/__init__.py` (console script `claude-data`): argparse + dispatch only. `archiver/` does acquisition; `curator/` is the local web app.
-- `src/claude_data/archiver/` is the acquisition package: `browser.py` persistent Chromium context/response capture; `login.py` email-code flow; `collect.py` scrolls "Recent" and parses list responses; `fetch.py` capture/retry/resume loop (also `read_org`); `media.py` external-media URLs; `files.py` uploaded-file discovery/download; `generated.py` `present_files` zip batches; `artifacts.py` inline artifact export; `store.py` archive paths, atomic writes, manifest; `env.py` `.env` loading. `run_file_tasks()` lives at the top level and drives the on-demand file/artifact modes.
+- `src/claude_data/archiver/` is the acquisition package: `browser.py` persistent Chromium context/response capture; `login.py` email-code flow; `collect.py` scrolls "Recent" and parses list responses; `fetch.py` capture/retry/resume loop (also `read_org`); `media.py` external-media URLs; `files.py` uploaded-file discovery/download; `generated.py` `present_files` zip batches; `artifacts.py` inline artifact export; `store.py` archive paths, atomic writes, manifest; `env.py` `.env` loading. `run_sync()` at the top level orchestrates one shared browser session across those passes; `_open_context()` is the single launch/login/minimize entry point and is injectable for tests.
 - `src/claude_data/curator/` is the local curator: `model.py` dataclasses, `pairs.py` active-path/Q&A extraction, `adapters.py` Claude normalization/assets, `library.py` aggregation/re-link, `store.py` revisioned collections, `render.py` sanitized Markdown/HTML, `export.py` self-contained bundles, `server.py` HTTP API, `static/` vanilla frontend.
 - Dependency direction is one-way: `curator` may import `archiver` (currently `safe_filename` from `files.py` and the atomic writers from `store.py`); `archiver` must never import `curator`. Both subpackages must stay importable from a wheel, so keep non-Python assets inside the package directory.
 - Archive layout (gitignored, regenerable):
@@ -35,7 +33,7 @@ Python >= 3.13, src layout, `uv_build` backend, one distribution `claude_data` w
   - `artifacts/{uuid}/{artifact_id}.{ext}` plus `{artifact_id}.meta.json`
   - `index.json` — manifest, rebuilt from disk each run
 - Downloaded uploaded files get a `local_path` field in `files[]`; the original remote URLs are preserved. Existing local files are skipped on re-runs; `--force` overwrites.
-- Resume rule: a conversation `.json` existing means complete (writes are atomic). Every archive run enumerates all conversations but fetches only missing uuids; `--refresh` overrides. `--download-files` never changes which conversations are archived.
+- Resume rule: a conversation `.json` existing means complete (writes are atomic). Every `sync` enumerates all conversations but fetches only missing uuids; `--refresh` overrides. `--conversation` scopes only the file/generated/artifact passes — it never changes which conversations are archived.
 
 ## Hard-won runtime facts
 
@@ -52,7 +50,7 @@ Python >= 3.13, src layout, `uv_build` backend, one distribution `claude_data` w
 - File endpoints are `/api/{org}/files/{uuid}/{preview|thumbnail|document_pdf}` — **not** `/api/organizations/{org}/...`. They reject `HEAD` and `Range` with 404; use a plain GET.
 - Generated `present_files` files download from `/api/organizations/{org}/conversations/{uuid}/wiggle/download-files?paths=...` as `application/zip`. Keep batches to ~8 paths (long URLs abort). A missing path aborts the whole batch, so fall back to one request per path and merge the successful zips.
 - `SendUserFile` file UUIDs and `blob` paths have no working download endpoint; they are recorded as unavailable rather than retried forever.
-- External media (absolute citation/link URLs) is still downloaded during the archive run, not by `--download-files`.
+- External media (absolute citation/link URLs) is downloaded during the conversation pass, before the file pass, in the same browser session.
 
 ## Secrets and generated data
 
@@ -65,12 +63,12 @@ Python >= 3.13, src layout, `uv_build` backend, one distribution `claude_data` w
 ## Testing notes
 
 - `tests/fixtures/conversation.json` intentionally has no media URLs; media extraction is tested with inline payloads. Don't treat the fixture as the full payload shape.
-- `tests/test_archiver_*.py` cover `archiver/`: parsing, planning, rewriting, resume, manifest, and the on-demand file/artifact passes plus window minimization. They inject fake fetchers/CDP sessions, so no browser is needed.
+- `tests/test_archiver_*.py` cover `archiver/`: parsing, planning, rewriting, resume, manifest, the file/artifact passes, `run_sync` orchestration (single shared context, pass order, dry-run, skip/force, exit codes), and window minimization. They inject fake fetchers/contexts/CDP sessions, so no browser is needed.
 - `tests/test_curator_*.py` (including `test_curator_cli.py` for `view`) plus `tests/conftest.py`/`tests/curator_fixtures.py` cover pair extraction, adapter assets, library reconciliation, revisioned storage, rendering/sanitization, export, server routing/traversal/409, and the `view` CLI. These use temp archives and injected fixtures, not a browser.
-- `tests/test_cli.py` stays unprefixed: it covers top-level argparse shared by both modes.
+- `tests/test_cli.py` stays unprefixed: it covers top-level argparse shared by both commands, including the `sync`/`view` flag split and the bare-invocation usage error.
 - Test modules are named for the subpackage they cover (`test_archiver_*`, `test_curator_*`) but live flat in `tests/`, so `curator_fixtures` imports work without path juggling.
 - No CI, pre-commit, ruff, or pyrefly config exists; defaults apply.
 
-## Status (2026-10-25)
+## Status (2026-10-26)
 
-147 tests pass; ruff and pyrefly are clean. The local archive holds 348 conversations / 3,371 messages / ~157 MB, including 93 uploaded files (92 WebP previews + 1 PDF; 8 blobs unavailable), 19 exported artifacts, and 55 generated-file zips. The curator derives 1,653 Q&A pairs and serves them through `uv run claude-data view`. Implementation plans: `docs/superpowers/plans/2026-10-04-claude-conversation-archiver.md` and `docs/superpowers/plans/2026-10-25-conversation-curator.md`.
+175 tests pass; ruff and pyrefly are clean. The local archive holds 348 conversations / 3,371 messages / ~157 MB, including 93 uploaded files (92 WebP previews + 1 PDF; 8 blobs unavailable), 19 exported artifacts, and 55 generated-file zips. The curator derives 1,653 Q&A pairs and serves them through `uv run claude-data view`. `claude-data sync` is a single command now: it fetches new conversations, then their files, zips, and artifacts. Implementation plans: `docs/superpowers/plans/2026-10-04-claude-conversation-archiver.md` and `docs/superpowers/plans/2026-10-25-conversation-curator.md`.
