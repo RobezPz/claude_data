@@ -209,3 +209,24 @@ any conversation/file/generated pass failed (or `lastActiveOrg` is unreadable),
 
 All writes stay atomic and skip-if-present; `--force` overwrites. The
 `GET`-only rules from the 2026-10-25 amendment still apply.
+
+## Amendment (2026-10-26): delivered text files
+
+`SendUserFile` deliveries showed up as `files[]` entries with
+`file_kind: "blob"` and only a sandbox `path`, so every one was recorded as
+unavailable. Plain `GET`s to `/files/{uuid}` (with and without
+`/download`, `/content`, `/original`, `/raw`, `/file`, `/preview`,
+`/document_pdf`), `/blobs/...`, `/uploads/...`, conversation-scoped paths, and
+the `wiggle/download-files` endpoint all return 404 for these UUIDs, so there is
+no remote bytes source.
+
+The transcript, however, contains the full text. When a blob's basename
+matches a later `Write` (`file_path`, `content`) or `create_file` (`path`,
+`file_text`) tool call, the file pass now writes that content to
+`files/{uuid}/{file_uuid}-{name}` and reports status `exported`; dry-run
+reports `planned`. The last write wins. If an `Edit`/`MultiEdit`/`str_replace`
+touches the path after its last write, the blob stays unavailable (with reason
+"delivered file was edited after creation") rather than archiving stale bytes.
+Binary deliveries and blobs produced by shell commands remain unavailable.
+Recovered entries get `local_path` in the payload, clear the meta
+`file_failures` entry, and surface as file assets in the curator.

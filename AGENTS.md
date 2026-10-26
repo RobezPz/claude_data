@@ -49,7 +49,7 @@ Python >= 3.13, src layout, `uv_build` backend, one distribution `claude_data` w
 - Uploaded `files[]` images expose `preview_url`/`thumbnail_url`; a plain GET returns WebP at ~952 px median width. Original image bytes are **not** exposed (`/original`, `/content`, `/download` 404). `document` entries expose `document_asset.url` (`document_pdf`, the original PDF). `blob` entries have only a sandbox `path`; no file endpoint works for them.
 - File endpoints are `/api/{org}/files/{uuid}/{preview|thumbnail|document_pdf}` — **not** `/api/organizations/{org}/...`. They reject `HEAD` and `Range` with 404; use a plain GET.
 - Generated `present_files` files download from `/api/organizations/{org}/conversations/{uuid}/wiggle/download-files?paths=...` as `application/zip`. Keep batches to ~8 paths (long URLs abort). A missing path aborts the whole batch, so fall back to one request per path and merge the successful zips.
-- `SendUserFile` file UUIDs and `blob` paths have no working download endpoint; they are recorded as unavailable rather than retried forever.
+- `SendUserFile` deliveries appear as `blob` entries with no working download endpoint (also probed with plain GET). Text files written by the assistant (`Write.file_path`/`content`, or older `create_file.path`/`file_text`) are **exported from the tool call** when a blob's filename matches; status is `exported`. A blob whose file was edited after its last full write is left unavailable rather than archiving stale bytes, and binary blobs stay unavailable.
 - External media (absolute citation/link URLs) is downloaded during the conversation pass, before the file pass, in the same browser session.
 
 ## Secrets and generated data
@@ -63,7 +63,7 @@ Python >= 3.13, src layout, `uv_build` backend, one distribution `claude_data` w
 ## Testing notes
 
 - `tests/fixtures/conversation.json` intentionally has no media URLs; media extraction is tested with inline payloads. Don't treat the fixture as the full payload shape.
-- `tests/test_archiver_*.py` cover `archiver/`: parsing, planning, rewriting, resume, manifest, the file/artifact passes, `run_sync` orchestration (single shared context, pass order, dry-run, skip/force, exit codes), and window minimization. They inject fake fetchers/contexts/CDP sessions, so no browser is needed.
+- `tests/test_archiver_*.py` cover `archiver/`: parsing, planning, rewriting, resume, manifest, the file/artifact passes, delivered-text recovery from write tools, `run_sync` orchestration (single shared context, pass order, dry-run, skip/force, exit codes), and window minimization. They inject fake fetchers/contexts/CDP sessions, so no browser is needed.
 - `tests/test_curator_*.py` (including `test_curator_cli.py` for `view`) plus `tests/conftest.py`/`tests/curator_fixtures.py` cover pair extraction, adapter assets, library reconciliation, revisioned storage, rendering/sanitization, export, server routing/traversal/409, and the `view` CLI. These use temp archives and injected fixtures, not a browser.
 - `tests/test_cli.py` stays unprefixed: it covers top-level argparse shared by both commands, including the `sync`/`view` flag split and the bare-invocation usage error.
 - Test modules are named for the subpackage they cover (`test_archiver_*`, `test_curator_*`) but live flat in `tests/`, so `curator_fixtures` imports work without path juggling.
@@ -71,4 +71,4 @@ Python >= 3.13, src layout, `uv_build` backend, one distribution `claude_data` w
 
 ## Status (2026-10-26)
 
-175 tests pass; ruff and pyrefly are clean. The local archive holds 348 conversations / 3,371 messages / ~157 MB, including 93 uploaded files (92 WebP previews + 1 PDF; 8 blobs unavailable), 19 exported artifacts, and 55 generated-file zips. The curator derives 1,653 Q&A pairs and serves them through `uv run claude-data view`. `claude-data sync` is a single command now: it fetches new conversations, then their files, zips, and artifacts. Implementation plans: `docs/superpowers/plans/2026-10-04-claude-conversation-archiver.md` and `docs/superpowers/plans/2026-10-25-conversation-curator.md`.
+183 tests pass; ruff and pyrefly are clean. The local archive holds 348 conversations / 3,371 messages / ~157 MB, including 93 uploaded files (92 WebP previews + 1 PDF; 8 blobs unavailable, 1 delivered markdown exported from its `Write` call), 19 exported artifacts, and 55 generated-file zips. The curator derives 1,653 Q&A pairs and serves them through `uv run claude-data view`. `claude-data sync` is a single command now: it fetches new conversations, then their files, zips, and artifacts. Implementation plans: `docs/superpowers/plans/2026-10-04-claude-conversation-archiver.md` and `docs/superpowers/plans/2026-10-25-conversation-curator.md`.

@@ -403,3 +403,184 @@ def test_process_archived_files_records_unavailable(tmp_path):
     assert meta["file_failures"] == [
         {"file_uuid": "blob-1", "reason": "no downloadable URL in payload"}
     ]
+
+
+def delivered_blob_payload(tool_name="Write"):
+    return payload_with(
+        {
+            "files": [
+                {
+                    "file_uuid": "blob-1",
+                    "file_name": "notes.md",
+                    "file_kind": "blob",
+                    "path": "/mnt/user-data/uploads/notes.md",
+                    "size_bytes": 7,
+                }
+            ]
+        },
+        {"content": [{"type": "tool_use", "name": tool_name, "input": {}}]},
+    )
+
+
+def test_extract_file_refs_recovers_delivered_text_from_write_tool():
+    payload = delivered_blob_payload()
+    payload["chat_messages"][1]["content"][0]["input"] = {
+        "file_path": "/mnt/user-data/uploads/notes.md",
+        "content": "# Notes",
+    }
+
+    refs = extract_file_refs("conv-1", payload)
+
+    assert refs[0].content == "# Notes"
+    assert refs[0].reason is None
+
+
+def test_extract_file_refs_recovers_delivered_text_from_create_file_tool():
+    payload = delivered_blob_payload(tool_name="create_file")
+    payload["chat_messages"][1]["content"][0]["input"] = {
+        "path": "/home/claude/notes.md",
+        "file_text": "# Notes",
+    }
+
+    refs = extract_file_refs("conv-1", payload)
+
+    assert refs[0].content == "# Notes"
+
+
+def test_extract_file_refs_skips_content_edited_after_the_write():
+    payload = delivered_blob_payload()
+    payload["chat_messages"][1]["content"] = [
+        {
+            "type": "tool_use",
+            "name": "Write",
+            "input": {
+                "file_path": "/mnt/user-data/uploads/notes.md",
+                "content": "# Notes",
+            },
+        },
+        {
+            "type": "tool_use",
+            "name": "Edit",
+            "input": {
+                "file_path": "/mnt/user-data/uploads/notes.md",
+                "old_string": "Notes",
+                "new_string": "Changed",
+            },
+        },
+    ]
+
+    refs = extract_file_refs("conv-1", payload)
+
+    assert refs[0].content is None
+    assert "edited" in refs[0].reason
+
+
+def test_plan_file_downloads_plans_recovered_content_without_a_url(tmp_path):
+    ref = make_ref(
+        file_uuid="blob-1",
+        file_name="notes.md",
+        kind="blob",
+        url=None,
+        variant=None,
+        content="# Notes",
+    )
+
+    plan = plan_file_downloads([ref], tmp_path)
+
+    planned = plan.to_download[0]
+    assert planned.content == "# Notes"
+    assert planned.local_path == tmp_path / "files" / "conv-1" / "blob-1-notes.md"
+
+
+def test_plan_file_downloads_skips_present_recovered_content(tmp_path):
+    ref = make_ref(
+        file_uuid="blob-1",
+        file_name="notes.md",
+        kind="blob",
+        url=None,
+        variant=None,
+        content="# Notes",
+    )
+    target = tmp_path / "files" / "conv-1" / "blob-1-notes.md"
+    target.parent.mkdir(parents=True)
+    target.write_text("already here")
+
+    plan = plan_file_downloads([ref], tmp_path)
+
+    assert plan.to_download == []
+    assert plan.results[0].status == "present"
+
+
+def test_download_files_exports_recovered_content_without_fetch(tmp_path):
+    ref = make_ref(
+        file_uuid="blob-1",
+        file_name="notes.md",
+        kind="blob",
+        url=None,
+        variant=None,
+        content="# Notes",
+    )
+    plan = plan_file_downloads([ref], tmp_path)
+
+    def fail(url):
+        raise AssertionError("recovered content must not be fetched")
+
+    results = download_files(plan, fail, tmp_path)
+
+    assert results[0].status == "exported"
+    assert results[0].size == len("# Notes")
+    assert plan.to_download[0].local_path.read_text() == "# Notes"
+
+
+def test_process_archived_files_exports_delivered_write_and_clears_failure(tmp_path):
+    conversation = "conv-1"
+    payload = delivered_blob_payload()
+    payload["chat_messages"][1]["content"][0]["input"] = {
+        "file_path": "/mnt/user-data/uploads/notes.md",
+        "content": "# Notes",
+    }
+    _write_conversation(
+        tmp_path,
+        conversation,
+        payload,
+        {
+            "file_failures": [
+                {"file_uuid": "blob-1", "reason": "no downloadable URL in payload"}
+            ]
+        },
+    )
+
+    def fail(url):
+        raise AssertionError("recovered content must not be fetched")
+
+    results = process_archived_files(tmp_path, [(conversation, payload)], fail)
+
+    assert results[0].status == "exported"
+    updated = json.loads(conversation_path(tmp_path, conversation).read_text())
+    local_path = updated["chat_messages"][0]["files"][0]["local_path"]
+    assert local_path == "files/conv-1/blob-1-notes.md"
+    assert (tmp_path / local_path).read_text() == "# Notes"
+    meta = json.loads(meta_path(tmp_path, conversation).read_text())
+    assert meta["files"]["blob-1"]["status"] == "exported"
+    assert meta["file_failures"] == []
+
+
+def test_process_archived_files_dry_run_plans_recovered_content(tmp_path):
+    conversation = "conv-1"
+    payload = delivered_blob_payload()
+    payload["chat_messages"][1]["content"][0]["input"] = {
+        "file_path": "/mnt/user-data/uploads/notes.md",
+        "content": "# Notes",
+    }
+    _write_conversation(tmp_path, conversation, payload, {"media": {}})
+
+    results = process_archived_files(
+        tmp_path,
+        [(conversation, payload)],
+        lambda url: (_ for _ in ()).throw(AssertionError("fetch must not run")),
+        dry_run=True,
+    )
+
+    assert results[0].status == "planned"
+    assert not (tmp_path / "files").exists()
+
