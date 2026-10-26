@@ -1,6 +1,6 @@
 import json
 
-from claude_data.artifacts import (
+from claude_data.archiver.artifacts import (
     Artifact,
     ArtifactResult,
     artifact_extension,
@@ -10,7 +10,7 @@ from claude_data.artifacts import (
     process_archived_artifacts,
     update_meta_artifacts,
 )
-from claude_data.store import atomic_write_json, conversation_path, meta_path
+from claude_data.archiver.store import atomic_write_json, conversation_path, meta_path
 
 
 def make_artifact(**overrides):

@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from claude_data.store import build_manifest
+from claude_data.archiver.store import build_manifest
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "conversation.json"
 

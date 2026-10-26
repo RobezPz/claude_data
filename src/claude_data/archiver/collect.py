@@ -4,7 +4,7 @@ from pathlib import Path
 
 from playwright.sync_api import Page
 
-from claude_data.browser import ResponseCapture
+from claude_data.archiver.browser import ResponseCapture
 
 LIST_URL_PATTERN = r"chat_conversations_v2\?"
 

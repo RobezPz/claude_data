@@ -3,6 +3,10 @@
 Date: 2026-10-04
 Status: Approved in brainstorming; pending implementation plan
 
+> 2026-10-26 layout note: the acquisition modules described below now live in
+> `src/claude_data/archiver/` (e.g. `archiver/store.py`, `archiver/fetch.py`).
+> The behavior is unchanged; only the import paths moved.
+
 ## Purpose
 
 Archive every conversation from a Claude.ai account for complete offline use

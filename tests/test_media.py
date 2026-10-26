@@ -1,6 +1,10 @@
 import re
 
-from claude_data.media import derive_media_filename, plan_downloads, rewrite_urls
+from claude_data.archiver.media import (
+    derive_media_filename,
+    plan_downloads,
+    rewrite_urls,
+)
 
 
 def test_rewrite_urls_replaces_exact_and_embedded():

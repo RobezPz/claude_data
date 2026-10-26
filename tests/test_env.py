@@ -1,6 +1,6 @@
 import pytest
 
-from claude_data.env import MissingUsernameError, read_env, require_username
+from claude_data.archiver.env import MissingUsernameError, read_env, require_username
 
 
 def test_read_env_parses_values_quotes_and_comments(tmp_path):

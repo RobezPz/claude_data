@@ -1,6 +1,6 @@
 import json
 
-from claude_data.files import (
+from claude_data.archiver.files import (
     DownloadError,
     Fetched,
     FileRef,
@@ -15,7 +15,7 @@ from claude_data.files import (
     safe_filename,
     update_meta,
 )
-from claude_data.store import atomic_write_json, conversation_path, meta_path
+from claude_data.archiver.store import atomic_write_json, conversation_path, meta_path
 
 
 def make_ref(**overrides):

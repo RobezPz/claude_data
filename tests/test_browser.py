@@ -1,4 +1,4 @@
-from claude_data.browser import minimize, restore
+from claude_data.archiver.browser import minimize, restore
 
 
 class FakeSession:

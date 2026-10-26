@@ -4,9 +4,9 @@ from pathlib import Path
 
 from playwright.sync_api import Page
 
-from claude_data.collect import ConversationRef
-from claude_data.media import extract_media_urls, plan_downloads, rewrite_urls
-from claude_data.store import (
+from claude_data.archiver.collect import ConversationRef
+from claude_data.archiver.media import extract_media_urls, plan_downloads, rewrite_urls
+from claude_data.archiver.store import (
     atomic_write_json,
     conversation_path,
     list_archived,

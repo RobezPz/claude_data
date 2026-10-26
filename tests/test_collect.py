@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from claude_data.collect import ConversationRef, parse_list_response
+from claude_data.archiver.collect import ConversationRef, parse_list_response
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "list_response.json"
 

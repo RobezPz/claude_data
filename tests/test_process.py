@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from claude_data.fetch import CaptureError, process_conversation
+from claude_data.archiver.fetch import CaptureError, process_conversation
 
 
 def test_process_conversation_writes_rewritten_payload_and_meta(tmp_path):

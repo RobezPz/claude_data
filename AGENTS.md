@@ -19,13 +19,14 @@
 
 ## Toolchain
 
-Python >= 3.13, src layout, `uv_build` backend, single package `claude_data`; dev dependency is pytest. Runtime deps include `markdown` and `bleach` for the curator renderer. README mandates uv + ruff + pyrefly, lint before typecheck.
+Python >= 3.13, src layout, `uv_build` backend, one distribution `claude_data` with the `archiver/` and `curator/` subpackages; dev dependency is pytest. Runtime deps include `markdown` and `bleach` for the curator renderer. README mandates uv + ruff + pyrefly, lint before typecheck.
 
 ## Wiring
 
-- Entry point is `main()` in `src/claude_data/__init__.py` (console script `claude-data`): parse args → load `.env` → launch → login → enumerate → fetch → rebuild manifest. `run_file_tasks()` handles the on-demand file/artifact modes.
-- `browser.py` persistent Chromium context/response capture; `login.py` email-code flow; `collect.py` scrolls "Recent" and parses list responses; `fetch.py` capture/retry/resume loop (also `read_org`); `media.py` external-media URLs; `files.py` uploaded-file discovery/download; `generated.py` `present_files` zip batches; `artifacts.py` inline artifact export; `store.py` archive paths, atomic writes, manifest.
+- Entry point is `main()` in `src/claude_data/__init__.py` (console script `claude-data`): argparse + dispatch only. `archiver/` does acquisition; `curator/` is the local web app.
+- `src/claude_data/archiver/` is the acquisition package: `browser.py` persistent Chromium context/response capture; `login.py` email-code flow; `collect.py` scrolls "Recent" and parses list responses; `fetch.py` capture/retry/resume loop (also `read_org`); `media.py` external-media URLs; `files.py` uploaded-file discovery/download; `generated.py` `present_files` zip batches; `artifacts.py` inline artifact export; `store.py` archive paths, atomic writes, manifest; `env.py` `.env` loading. `run_file_tasks()` lives at the top level and drives the on-demand file/artifact modes.
 - `src/claude_data/curator/` is the local curator: `model.py` dataclasses, `pairs.py` active-path/Q&A extraction, `adapters.py` Claude normalization/assets, `library.py` aggregation/re-link, `store.py` revisioned collections, `render.py` sanitized Markdown/HTML, `export.py` self-contained bundles, `server.py` HTTP API, `static/` vanilla frontend.
+- Dependency direction is one-way: `curator` may import `archiver` (currently `safe_filename` from `files.py` and the atomic writers from `store.py`); `archiver` must never import `curator`. Both subpackages must stay importable from a wheel, so keep non-Python assets inside the package directory.
 - Archive layout (gitignored, regenerable):
   - `conversations/{uuid}.json`, `conversations/{uuid}.meta.json` (media/files/artifacts/generated mappings + failures)
   - `media/{filename}` — external citation/link media
@@ -58,7 +59,7 @@ Python >= 3.13, src layout, `uv_build` backend, single package `claude_data`; de
 - `.env` contains only `CLAUDE_USERNAME` and is gitignored — never commit, print, or log its contents. A missing key exits 2 before the browser starts.
 - `archive/` is generated output — never commit. `~/.cache/claude_data/profile/` is outside the repo.
 - `curated/` is **user data**, gitignored: `collections.json` (revisioned; keeps a `.bak`) and `exports/`. Back it up; do not regenerate or delete it. The curator server binds `127.0.0.1` and never fetches external URLs.
-- **Never persist raw Playwright exception strings**: `APIRequestContext` errors embed the full cookie/session headers. Use `files.error_reason()`, which keeps our own `DownloadError`/`OSError` messages and reduces unknown exceptions to a class name.
+- **Never persist raw Playwright exception strings**: `APIRequestContext` errors embed the full cookie/session headers. Use `archiver.files.error_reason()`, which keeps our own `DownloadError`/`OSError` messages and reduces unknown exceptions to a class name.
 - Browser flows are manually verified only; unit tests cover pure logic (parsing, planning, rewriting, resume, manifest, artifact/zip export) against synthetic payloads.
 
 ## Testing notes
