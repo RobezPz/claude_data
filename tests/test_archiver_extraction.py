@@ -1,8 +1,8 @@
 import json
 from pathlib import Path
 
-from claude_data.media import extract_media_urls
-from claude_data.store import extract_metadata
+from claude_data.archiver.media import extract_media_urls
+from claude_data.archiver.store import extract_metadata
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "conversation.json"
 

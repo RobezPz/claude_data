@@ -6,8 +6,8 @@ from contextlib import contextmanager
 from dataclasses import asdict
 from pathlib import Path
 
+from claude_data.archiver.store import atomic_write_json
 from claude_data.curator.model import Collection, CollectionItem, State
-from claude_data.store import atomic_write_json
 
 STATE_VERSION = 1
 STATE_FILE = "collections.json"

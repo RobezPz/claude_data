@@ -7,7 +7,7 @@ from pathlib import Path
 from playwright.sync_api import BrowserContext
 from playwright.sync_api import Error as PlaywrightError
 
-from claude_data.store import atomic_write_bytes, media_path
+from claude_data.archiver.store import atomic_write_bytes, media_path
 
 
 @dataclass(frozen=True)

@@ -5,7 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from claude_data.store import (
+from claude_data.archiver.store import (
     atomic_write_bytes,
     atomic_write_json,
     conversation_path,

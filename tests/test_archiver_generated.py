@@ -3,8 +3,8 @@ import json
 import zipfile
 from urllib.parse import parse_qs, urlsplit
 
-from claude_data.files import DownloadError, Fetched
-from claude_data.generated import (
+from claude_data.archiver.files import DownloadError, Fetched
+from claude_data.archiver.generated import (
     GeneratedResult,
     chunk_paths,
     download_generated_zips,
@@ -13,7 +13,7 @@ from claude_data.generated import (
     process_archived_generated,
     update_meta_generated,
 )
-from claude_data.store import atomic_write_json, conversation_path, meta_path
+from claude_data.archiver.store import atomic_write_json, conversation_path, meta_path
 
 
 def present_payload(*paths):

@@ -8,7 +8,7 @@
 
 - `uv sync` — create/sync `.venv` (uv only, never pip; add deps with `uv add`)
 - `uv run playwright install chromium` — one-time browser install for a fresh environment
-- `uv run pytest` — full suite (~0.2 s, no browser/network); single test: `uv run pytest tests/test_media.py::test_plan_downloads_skips_existing_and_dedupes`
+- `uv run pytest` — full suite (~5 s, no browser/network); single test: `uv run pytest tests/test_archiver_media.py::test_plan_downloads_skips_existing_and_dedupes`
 - `uvx ruff check` then `uvx pyrefly check` — required before commits; neither is a project dependency and neither has a config file. Pyrefly logs a "No pyrefly.toml" info line but exits 0 when clean (0 errors).
 - `uv run claude-data` — real archive run. Opens a **visible** browser and can block on an emailed-code login; never use it as part of automated verification. The window is minimized via CDP immediately after launch; `--show-browser` keeps it visible, and login/Cloudflare restores it automatically.
 - `uv run claude-data --login` / `--refresh [UUID]` — force re-auth / re-fetch all (bare) or one conversation. `--headed` is accepted but changes nothing.
@@ -19,13 +19,14 @@
 
 ## Toolchain
 
-Python >= 3.13, src layout, `uv_build` backend, single package `claude_data`; dev dependency is pytest. Runtime deps include `markdown` and `bleach` for the curator renderer. README mandates uv + ruff + pyrefly, lint before typecheck.
+Python >= 3.13, src layout, `uv_build` backend, one distribution `claude_data` with the `archiver/` and `curator/` subpackages; dev dependency is pytest. Runtime deps include `markdown` and `bleach` for the curator renderer. README mandates uv + ruff + pyrefly, lint before typecheck.
 
 ## Wiring
 
-- Entry point is `main()` in `src/claude_data/__init__.py` (console script `claude-data`): parse args → load `.env` → launch → login → enumerate → fetch → rebuild manifest. `run_file_tasks()` handles the on-demand file/artifact modes.
-- `browser.py` persistent Chromium context/response capture; `login.py` email-code flow; `collect.py` scrolls "Recent" and parses list responses; `fetch.py` capture/retry/resume loop (also `read_org`); `media.py` external-media URLs; `files.py` uploaded-file discovery/download; `generated.py` `present_files` zip batches; `artifacts.py` inline artifact export; `store.py` archive paths, atomic writes, manifest.
+- Entry point is `main()` in `src/claude_data/__init__.py` (console script `claude-data`): argparse + dispatch only. `archiver/` does acquisition; `curator/` is the local web app.
+- `src/claude_data/archiver/` is the acquisition package: `browser.py` persistent Chromium context/response capture; `login.py` email-code flow; `collect.py` scrolls "Recent" and parses list responses; `fetch.py` capture/retry/resume loop (also `read_org`); `media.py` external-media URLs; `files.py` uploaded-file discovery/download; `generated.py` `present_files` zip batches; `artifacts.py` inline artifact export; `store.py` archive paths, atomic writes, manifest; `env.py` `.env` loading. `run_file_tasks()` lives at the top level and drives the on-demand file/artifact modes.
 - `src/claude_data/curator/` is the local curator: `model.py` dataclasses, `pairs.py` active-path/Q&A extraction, `adapters.py` Claude normalization/assets, `library.py` aggregation/re-link, `store.py` revisioned collections, `render.py` sanitized Markdown/HTML, `export.py` self-contained bundles, `server.py` HTTP API, `static/` vanilla frontend.
+- Dependency direction is one-way: `curator` may import `archiver` (currently `safe_filename` from `files.py` and the atomic writers from `store.py`); `archiver` must never import `curator`. Both subpackages must stay importable from a wheel, so keep non-Python assets inside the package directory.
 - Archive layout (gitignored, regenerable):
   - `conversations/{uuid}.json`, `conversations/{uuid}.meta.json` (media/files/artifacts/generated mappings + failures)
   - `media/{filename}` — external citation/link media
@@ -58,14 +59,16 @@ Python >= 3.13, src layout, `uv_build` backend, single package `claude_data`; de
 - `.env` contains only `CLAUDE_USERNAME` and is gitignored — never commit, print, or log its contents. A missing key exits 2 before the browser starts.
 - `archive/` is generated output — never commit. `~/.cache/claude_data/profile/` is outside the repo.
 - `curated/` is **user data**, gitignored: `collections.json` (revisioned; keeps a `.bak`) and `exports/`. Back it up; do not regenerate or delete it. The curator server binds `127.0.0.1` and never fetches external URLs.
-- **Never persist raw Playwright exception strings**: `APIRequestContext` errors embed the full cookie/session headers. Use `files.error_reason()`, which keeps our own `DownloadError`/`OSError` messages and reduces unknown exceptions to a class name.
+- **Never persist raw Playwright exception strings**: `APIRequestContext` errors embed the full cookie/session headers. Use `archiver.files.error_reason()`, which keeps our own `DownloadError`/`OSError` messages and reduces unknown exceptions to a class name.
 - Browser flows are manually verified only; unit tests cover pure logic (parsing, planning, rewriting, resume, manifest, artifact/zip export) against synthetic payloads.
 
 ## Testing notes
 
 - `tests/fixtures/conversation.json` intentionally has no media URLs; media extraction is tested with inline payloads. Don't treat the fixture as the full payload shape.
-- `tests/test_files.py`, `tests/test_generated.py`, `tests/test_artifacts.py`, `tests/test_fetch.py`, and `tests/test_browser.py` cover the on-demand passes and window minimization; they inject fake fetchers/CDP sessions, so no browser is needed.
-- `tests/test_curator_*.py` plus `tests/conftest.py`/`tests/curator_fixtures.py` cover pair extraction, adapter assets, library reconciliation, revisioned storage, rendering/sanitization, export, server routing/traversal/409, and the `view` CLI. These use temp archives and injected fixtures, not a browser.
+- `tests/test_archiver_*.py` cover `archiver/`: parsing, planning, rewriting, resume, manifest, and the on-demand file/artifact passes plus window minimization. They inject fake fetchers/CDP sessions, so no browser is needed.
+- `tests/test_curator_*.py` (including `test_curator_cli.py` for `view`) plus `tests/conftest.py`/`tests/curator_fixtures.py` cover pair extraction, adapter assets, library reconciliation, revisioned storage, rendering/sanitization, export, server routing/traversal/409, and the `view` CLI. These use temp archives and injected fixtures, not a browser.
+- `tests/test_cli.py` stays unprefixed: it covers top-level argparse shared by both modes.
+- Test modules are named for the subpackage they cover (`test_archiver_*`, `test_curator_*`) but live flat in `tests/`, so `curator_fixtures` imports work without path juggling.
 - No CI, pre-commit, ruff, or pyrefly config exists; defaults apply.
 
 ## Status (2026-10-25)

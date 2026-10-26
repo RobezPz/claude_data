@@ -3,7 +3,7 @@ import time
 from playwright.sync_api import BrowserContext, Page
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
 
-from claude_data.browser import is_logged_in
+from claude_data.archiver.browser import is_logged_in
 
 EMAIL_INPUT = 'input[type="email"]'
 CONTINUE_BUTTON = 'button[type="submit"]'

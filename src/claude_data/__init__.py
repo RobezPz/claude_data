@@ -3,26 +3,26 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-from claude_data.artifacts import process_archived_artifacts
-from claude_data.browser import is_logged_in, launch, minimize, restore
-from claude_data.collect import collect_conversations
-from claude_data.env import MissingUsernameError, read_env, require_username
-from claude_data.fetch import (
+from claude_data.archiver.artifacts import process_archived_artifacts
+from claude_data.archiver.browser import is_logged_in, launch, minimize, restore
+from claude_data.archiver.collect import collect_conversations
+from claude_data.archiver.env import MissingUsernameError, read_env, require_username
+from claude_data.archiver.fetch import (
     CaptureError,
     capture_payload,
     fetch_all,
     process_conversation,
     read_org,
 )
-from claude_data.files import (
+from claude_data.archiver.files import (
     DownloadError,
     Fetched,
     process_archived_files,
 )
-from claude_data.generated import generated_url, process_archived_generated
-from claude_data.login import login
-from claude_data.media import download_media
-from claude_data.store import (
+from claude_data.archiver.generated import generated_url, process_archived_generated
+from claude_data.archiver.login import login
+from claude_data.archiver.media import download_media
+from claude_data.archiver.store import (
     atomic_write_json,
     build_manifest,
     load_archived,
