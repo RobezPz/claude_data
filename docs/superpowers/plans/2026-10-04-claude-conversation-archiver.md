@@ -10,6 +10,11 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-04-claude-conversation-archiver-design.md`
 
+> 2026-10-26 note: this plan was executed as written against a flat `src/claude_data/`.
+> The modules were later moved to `src/claude_data/archiver/` and the tests renamed
+> with a `test_archiver_` prefix (`tests/test_store.py` → `tests/test_archiver_store.py`,
+> etc.). Task text below keeps the original paths as a record of what was executed.
+
 ## Global Constraints
 
 - Python >= 3.13; uv only (never pip); deps only via `uv add` (runtime: `playwright`; dev: `pytest`)

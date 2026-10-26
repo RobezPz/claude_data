@@ -8,7 +8,7 @@
 
 - `uv sync` — create/sync `.venv` (uv only, never pip; add deps with `uv add`)
 - `uv run playwright install chromium` — one-time browser install for a fresh environment
-- `uv run pytest` — full suite (~0.2 s, no browser/network); single test: `uv run pytest tests/test_media.py::test_plan_downloads_skips_existing_and_dedupes`
+- `uv run pytest` — full suite (~5 s, no browser/network); single test: `uv run pytest tests/test_archiver_media.py::test_plan_downloads_skips_existing_and_dedupes`
 - `uvx ruff check` then `uvx pyrefly check` — required before commits; neither is a project dependency and neither has a config file. Pyrefly logs a "No pyrefly.toml" info line but exits 0 when clean (0 errors).
 - `uv run claude-data` — real archive run. Opens a **visible** browser and can block on an emailed-code login; never use it as part of automated verification. The window is minimized via CDP immediately after launch; `--show-browser` keeps it visible, and login/Cloudflare restores it automatically.
 - `uv run claude-data --login` / `--refresh [UUID]` — force re-auth / re-fetch all (bare) or one conversation. `--headed` is accepted but changes nothing.
@@ -65,8 +65,10 @@ Python >= 3.13, src layout, `uv_build` backend, one distribution `claude_data` w
 ## Testing notes
 
 - `tests/fixtures/conversation.json` intentionally has no media URLs; media extraction is tested with inline payloads. Don't treat the fixture as the full payload shape.
-- `tests/test_files.py`, `tests/test_generated.py`, `tests/test_artifacts.py`, `tests/test_fetch.py`, and `tests/test_browser.py` cover the on-demand passes and window minimization; they inject fake fetchers/CDP sessions, so no browser is needed.
-- `tests/test_curator_*.py` plus `tests/conftest.py`/`tests/curator_fixtures.py` cover pair extraction, adapter assets, library reconciliation, revisioned storage, rendering/sanitization, export, server routing/traversal/409, and the `view` CLI. These use temp archives and injected fixtures, not a browser.
+- `tests/test_archiver_*.py` cover `archiver/`: parsing, planning, rewriting, resume, manifest, and the on-demand file/artifact passes plus window minimization. They inject fake fetchers/CDP sessions, so no browser is needed.
+- `tests/test_curator_*.py` (including `test_curator_cli.py` for `view`) plus `tests/conftest.py`/`tests/curator_fixtures.py` cover pair extraction, adapter assets, library reconciliation, revisioned storage, rendering/sanitization, export, server routing/traversal/409, and the `view` CLI. These use temp archives and injected fixtures, not a browser.
+- `tests/test_cli.py` stays unprefixed: it covers top-level argparse shared by both modes.
+- Test modules are named for the subpackage they cover (`test_archiver_*`, `test_curator_*`) but live flat in `tests/`, so `curator_fixtures` imports work without path juggling.
 - No CI, pre-commit, ruff, or pyrefly config exists; defaults apply.
 
 ## Status (2026-10-25)

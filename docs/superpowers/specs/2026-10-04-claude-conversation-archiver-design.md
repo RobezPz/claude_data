@@ -4,8 +4,9 @@ Date: 2026-10-04
 Status: Approved in brainstorming; pending implementation plan
 
 > 2026-10-26 layout note: the acquisition modules described below now live in
-> `src/claude_data/archiver/` (e.g. `archiver/store.py`, `archiver/fetch.py`).
-> The behavior is unchanged; only the import paths moved.
+> `src/claude_data/archiver/` (e.g. `archiver/store.py`, `archiver/fetch.py`),
+> and their tests carry the `test_archiver_` prefix (`tests/test_archiver_store.py`,
+> `tests/test_archiver_media.py`, ...). The behavior is unchanged; only the paths moved.
 
 ## Purpose
 
