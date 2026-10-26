@@ -38,6 +38,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         description="Archive Claude.ai conversations for offline viewing.",
     )
     parser.add_argument(
+        "command",
+        nargs="?",
+        choices=["view"],
+        default=None,
+        help="optional command; 'view' starts the local curator",
+    )
+    parser.add_argument(
         "--login",
         action="store_true",
         help="log in interactively before archiving",
@@ -93,7 +100,53 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="show planned downloads without writing anything",
     )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=None,
+        help="view server port (default 8765)",
+    )
+    parser.add_argument(
+        "--archive",
+        type=Path,
+        default=None,
+        help="archive root for view (default archive/)",
+    )
+    parser.add_argument(
+        "--data-dir",
+        type=Path,
+        default=None,
+        help="curated data directory for view (default curated/)",
+    )
+    parser.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="do not open a browser when starting view",
+    )
     args = parser.parse_args(argv)
+    if args.command == "view":
+        archive_flags = (
+            args.login
+            or args.headed
+            or args.refresh is not None
+            or args.show_browser
+            or args.download_files
+            or args.export_artifacts
+            or args.conversation is not None
+            or args.max_size_mb != 0.0
+            or args.force
+            or args.dry_run
+        )
+        if archive_flags:
+            parser.error("archive flags cannot be used with view")
+        return args
+    if (
+        args.port is not None
+        or args.archive is not None
+        or args.data_dir is not None
+        or args.no_browser
+    ):
+        parser.error("--port/--archive/--data-dir/--no-browser require view")
     file_mode = args.download_files or args.export_artifacts
     if file_mode and args.refresh is not None:
         parser.error("--refresh cannot be combined with --download-files/--export-artifacts")
@@ -283,6 +336,16 @@ def run_file_tasks(args: argparse.Namespace) -> None:
 
 def main() -> None:
     args = parse_args()
+    if args.command == "view":
+        from claude_data.curator.server import serve
+
+        serve(
+            archive_root=args.archive or ARCHIVE_ROOT,
+            data_dir=args.data_dir or Path("curated"),
+            port=args.port or 8765,
+            open_browser=not args.no_browser,
+        )
+        return
     if args.download_files or args.export_artifacts:
         run_file_tasks(args)
         return
