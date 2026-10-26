@@ -127,6 +127,89 @@ def test_unmatched_generated_zip_is_source_level(tmp_path):
     assert [a.kind for a in bundle.source.assets] == ["generated"]
 
 
+def test_file_assets_carry_origin_from_message_sender(tmp_path):
+    payload = {
+        "uuid": "conv-1",
+        "chat_messages": [
+            {
+                **message("h1", "human", 0),
+                "files": [
+                    {
+                        "file_uuid": "f1",
+                        "file_name": "photo.png",
+                        "file_kind": "image",
+                        "local_path": "files/conv-1/photo.webp",
+                    }
+                ],
+            },
+            {
+                **message("a1", "assistant", 1, parent="h1"),
+                "files": [
+                    {
+                        "file_uuid": "f2",
+                        "file_name": "notes.md",
+                        "file_kind": "blob",
+                        "local_path": "files/conv-1/notes.md",
+                    }
+                ],
+            },
+        ],
+        "current_leaf_message_uuid": "a1",
+    }
+    path = write_conversation(tmp_path, payload)
+    bundle = ClaudeAdapter().load(path, tmp_path)
+    origins = {
+        asset.asset_id: asset.origin
+        for message_ in bundle.messages
+        for asset in message_.assets
+        if asset.kind != "media"
+    }
+    assert origins == {"file:claude:conv-1:f1": "user", "file:claude:conv-1:f2": "assistant"}
+
+
+def test_generated_and_artifact_assets_are_labelled_assistant(tmp_path):
+    (tmp_path / "artifacts" / "conv-1").mkdir(parents=True)
+    (tmp_path / "artifacts" / "conv-1" / "demo.py").write_text("print(1)")
+    (tmp_path / "generated" / "conv-1").mkdir(parents=True)
+    (tmp_path / "generated" / "conv-1" / "files-1.zip").write_bytes(b"x")
+    payload = {
+        "uuid": "conv-1",
+        "chat_messages": [
+            {
+                **message("a1", "assistant", 0),
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "name": "artifacts",
+                        "input": {"id": "demo", "title": "Demo"},
+                    },
+                    {
+                        "type": "tool_result",
+                        "name": "present_files",
+                        "content": [
+                            {"type": "local_resource", "file_path": "/out/report.txt"}
+                        ],
+                    },
+                ],
+            }
+        ],
+        "current_leaf_message_uuid": "a1",
+    }
+    meta = {
+        "artifacts": {"demo": {"path": "artifacts/conv-1/demo.py"}},
+        "generated": [
+            {
+                "path": "generated/conv-1/files-1.zip",
+                "source_paths": ["/out/report.txt"],
+            }
+        ],
+    }
+    path = write_conversation(tmp_path, payload, meta)
+    bundle = ClaudeAdapter().load(path, tmp_path)
+    by_kind = {asset.kind: asset.origin for asset in bundle.messages[0].assets}
+    assert by_kind == {"artifact": "assistant", "generated": "assistant"}
+
+
 def test_missing_meta_is_tolerated(tmp_path):
     payload = {
         "uuid": "conv-1",

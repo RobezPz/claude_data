@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
+from claude_data.archiver.files import origin_for_sender
 from claude_data.curator.model import Asset, Message, Source
 
 
@@ -34,6 +35,7 @@ def _message_assets(
     used_generated: set[str],
 ) -> list[Asset]:
     assets: dict[str, Asset] = {}
+    origin = origin_for_sender(raw.get("sender"))
 
     for item in raw.get("files") or []:
         if not isinstance(item, dict) or not item.get("file_uuid"):
@@ -50,6 +52,7 @@ def _message_assets(
             local_path=item.get("local_path"),
             remote_url=remote_url,
             message_uuid=message_uuid,
+            origin=origin,
         )
 
     searchable = json.dumps(raw, ensure_ascii=False)
@@ -81,6 +84,7 @@ def _message_assets(
                     local_path=entry.get("path"),
                     artifact_id=artifact_id,
                     message_uuid=message_uuid,
+                    origin="assistant",
                 )
 
     for block in content:
@@ -107,6 +111,7 @@ def _message_assets(
                     local_path=entry["path"],
                     source_paths=tuple(source_paths),
                     message_uuid=message_uuid,
+                    origin="assistant",
                 )
                 break
 
@@ -180,6 +185,7 @@ class ClaudeAdapter:
                 label=Path(entry["path"]).name,
                 local_path=entry["path"],
                 source_paths=tuple(entry.get("source_paths") or []),
+                origin="assistant",
             )
             for entry in generated_entries
             if entry["path"] not in used_generated

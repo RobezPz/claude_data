@@ -230,3 +230,25 @@ touches the path after its last write, the blob stays unavailable (with reason
 Binary deliveries and blobs produced by shell commands remain unavailable.
 Recovered entries get `local_path` in the payload, clear the meta
 `file_failures` entry, and surface as file assets in the curator.
+
+## Amendment (2026-10-26): file provenance labels
+
+`files/` mixes two kinds of attachments: things the person uploaded and files
+Claude delivered (`SendUserFile`, stored as a `files[]` blob). The folder split
+stays as it is — the payload itself models both as `files[]` entries on a
+message — but each record now carries an `origin`.
+
+The carrier message's `sender` is the discriminator: `human` means the file was
+uploaded (`origin: "user"`), `assistant` means Claude delivered it
+(`origin: "assistant"`). A `files[]` entry with no recognisable sender gets no
+`origin`. `extract_file_refs()` sets it from the message, `update_meta()` writes
+it into `conversations/{uuid}.meta.json` (omitted when unknown), and
+`build_manifest()` copies it into `index.json` unchanged.
+
+The curator does not depend on the backfill: `ClaudeAdapter` derives `origin`
+from the same `sender` field while loading the payload, so labels appear
+immediately. `generated` and `artifact` assets are always `assistant` (they
+only exist because Claude produced them); `media` assets stay unlabelled
+because an external citation can come from either side. The curator UI renders
+`origin` as a small muted badge (`user` / `assistant`) after each attachment.
+Exported bundles are unchanged.

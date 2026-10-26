@@ -28,11 +28,12 @@ Python >= 3.13, src layout, `uv_build` backend, one distribution `claude_data` w
 - Archive layout (gitignored, regenerable):
   - `conversations/{uuid}.json`, `conversations/{uuid}.meta.json` (media/files/artifacts/generated mappings + failures)
   - `media/{filename}` — external citation/link media
-  - `files/{uuid}/{file_uuid}-{name}` — uploaded images (WebP preview) and PDF originals
+  - `files/{uuid}/{file_uuid}-{name}` — the attachment channel: uploaded images (WebP preview) and PDF originals, plus text files Claude delivered via `SendUserFile` (recovered from its `Write` call)
   - `generated/{uuid}/files-N.zip` — assistant `present_files` batches
   - `artifacts/{uuid}/{artifact_id}.{ext}` plus `{artifact_id}.meta.json`
   - `index.json` — manifest, rebuilt from disk each run
 - Downloaded uploaded files get a `local_path` field in `files[]`; the original remote URLs are preserved. Existing local files are skipped on re-runs; `--force` overwrites.
+- Every meta `files[]` record carries `origin`: `user` for a `files[]` entry on a `human` message (an upload), `assistant` for one on an `assistant` message (delivered by Claude). `files/` deliberately stays one folder for both; the curator renders `origin` as a label after each attachment. The curator derives it from the payload `sender` at load time, so labels appear even before a meta backfill; `index.json` copies the meta value on the next `sync`.
 - Resume rule: a conversation `.json` existing means complete (writes are atomic). Every `sync` enumerates all conversations but fetches only missing uuids; `--refresh` overrides. `--conversation` scopes only the file/generated/artifact passes — it never changes which conversations are archived.
 
 ## Hard-won runtime facts
@@ -71,4 +72,4 @@ Python >= 3.13, src layout, `uv_build` backend, one distribution `claude_data` w
 
 ## Status (2026-10-26)
 
-183 tests pass; ruff and pyrefly are clean. The local archive holds 348 conversations / 3,371 messages / ~157 MB, including 93 uploaded files (92 WebP previews + 1 PDF; 8 blobs unavailable, 1 delivered markdown exported from its `Write` call), 19 exported artifacts, and 55 generated-file zips. The curator derives 1,653 Q&A pairs and serves them through `uv run claude-data view`. `claude-data sync` is a single command now: it fetches new conversations, then their files, zips, and artifacts. Implementation plans: `docs/superpowers/plans/2026-10-04-claude-conversation-archiver.md` and `docs/superpowers/plans/2026-10-25-conversation-curator.md`.
+190 tests pass; ruff and pyrefly are clean. The local archive holds 348 conversations / 3,371 messages / ~157 MB, including 93 uploaded files (92 WebP previews + 1 PDF; 8 blobs unavailable, 1 delivered markdown exported from its `Write` call), 19 exported artifacts, and 55 generated-file zips. File records are labelled by origin (`102 user`, `1 assistant`). The curator derives 1,653 Q&A pairs and serves them through `uv run claude-data view`. `claude-data sync` is a single command now: it fetches new conversations, then their files, zips, and artifacts. Implementation plans: `docs/superpowers/plans/2026-10-04-claude-conversation-archiver.md` and `docs/superpowers/plans/2026-10-25-conversation-curator.md`.

@@ -98,7 +98,13 @@ def test_render_message_uses_thinking_summaries_and_tool_result_titles():
 
 
 def test_render_pair_returns_assets():
-    asset = Asset(asset_id="a1", kind="image", label="x", local_path="files/x.webp")
+    asset = Asset(
+        asset_id="a1",
+        kind="image",
+        label="x",
+        local_path="files/x.webp",
+        origin="user",
+    )
     question = msg("h1", "human", [{"type": "text", "text": "q"}])
     answer = msg("a1", "assistant", [{"type": "text", "text": "a"}])
     pair = Pair(
@@ -115,4 +121,5 @@ def test_render_pair_returns_assets():
     )
     rendered = render_pair(pair, question, [answer])
     assert rendered["assets"][0]["kind"] == "image"
+    assert rendered["assets"][0]["origin"] == "user"
     assert "q" in rendered["question_html"]

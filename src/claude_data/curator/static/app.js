@@ -426,6 +426,12 @@ function renderPreviewAssets(assets) {
     } else {
       item.textContent = `${asset.label} (unavailable)`;
     }
+    if (asset.origin) {
+      const badge = document.createElement("span");
+      badge.className = `asset-origin asset-origin-${asset.origin}`;
+      badge.textContent = asset.origin;
+      item.appendChild(badge);
+    }
     list.appendChild(item);
   }
   const wrapper = document.createElement("div");

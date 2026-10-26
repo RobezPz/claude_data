@@ -29,6 +29,7 @@ class FileRef:
     variant: str | None
     reason: str | None = None
     content: str | None = None
+    origin: str | None = None
 
 
 @dataclass(frozen=True)
@@ -159,12 +160,22 @@ def written_file_contents(payload: dict) -> tuple[dict[str, str], set[str]]:
     return written, edited
 
 
+# A `files[]` entry lives on the message that carries it. Human messages carry
+# uploads; assistant messages carry files Claude delivered (e.g. `SendUserFile`).
+_FILE_ORIGINS = {"human": "user", "assistant": "assistant"}
+
+
+def origin_for_sender(sender: object) -> str | None:
+    return _FILE_ORIGINS.get(str(sender)) if isinstance(sender, str) else None
+
+
 def extract_file_refs(conversation: str, payload: dict) -> list[FileRef]:
     written, edited = written_file_contents(payload)
     refs: dict[str, FileRef] = {}
     for message in payload.get("chat_messages", []):
         if not isinstance(message, dict):
             continue
+        origin = origin_for_sender(message.get("sender"))
         for item in message.get("files") or []:
             if not isinstance(item, dict) or not item.get("file_uuid"):
                 continue
@@ -199,6 +210,7 @@ def extract_file_refs(conversation: str, payload: dict) -> list[FileRef]:
                 variant=variant,
                 reason=reason,
                 content=content,
+                origin=origin,
             )
     return list(refs.values())
 
@@ -413,6 +425,8 @@ def update_meta(meta: dict, results: list[FileResult]) -> dict:
             "size_bytes": result.ref.size_bytes,
             "status": result.status,
         }
+        if result.ref.origin:
+            entry["origin"] = result.ref.origin
         if result.local_path:
             entry["path"] = result.local_path
         if result.size is not None:

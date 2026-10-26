@@ -565,6 +565,119 @@ def test_process_archived_files_exports_delivered_write_and_clears_failure(tmp_p
     assert meta["file_failures"] == []
 
 
+def test_extract_file_refs_labels_human_attachment_as_user():
+    payload = payload_with(
+        {
+            "sender": "human",
+            "files": [
+                {
+                    "file_uuid": "img-1",
+                    "file_name": "photo.png",
+                    "file_kind": "image",
+                    "preview_url": "/api/org/files/img-1/preview",
+                }
+            ],
+        }
+    )
+
+    refs = extract_file_refs("conv-1", payload)
+
+    assert refs[0].origin == "user"
+
+
+def test_extract_file_refs_labels_assistant_attachment_as_assistant():
+    payload = payload_with(
+        {
+            "sender": "assistant",
+            "files": [
+                {
+                    "file_uuid": "blob-1",
+                    "file_name": "notes.md",
+                    "file_kind": "blob",
+                }
+            ],
+        }
+    )
+
+    refs = extract_file_refs("conv-1", payload)
+
+    assert refs[0].origin == "assistant"
+
+
+def test_extract_file_refs_leaves_origin_unset_without_a_sender():
+    payload = payload_with(
+        {
+            "files": [
+                {
+                    "file_uuid": "img-1",
+                    "file_name": "photo.png",
+                    "file_kind": "image",
+                    "preview_url": "/api/org/files/img-1/preview",
+                }
+            ]
+        }
+    )
+
+    refs = extract_file_refs("conv-1", payload)
+
+    assert refs[0].origin is None
+
+
+def test_update_meta_records_file_origin_and_omits_unknown(tmp_path):
+    results = [
+        FileResult(
+            ref=make_ref(origin="user"),
+            status="downloaded",
+            local_path="files/conv-1/img-1.webp",
+        ),
+        FileResult(
+            ref=make_ref(file_uuid="blob-1", url=None, variant=None, origin="assistant"),
+            status="exported",
+            local_path="files/conv-1/blob-1-notes.md",
+        ),
+        FileResult(
+            ref=make_ref(file_uuid="mystery-1"),
+            status="present",
+            local_path="files/conv-1/mystery-1.webp",
+        ),
+    ]
+
+    updated = update_meta({}, results)
+
+    assert updated["files"]["file-1"]["origin"] == "user"
+    assert updated["files"]["blob-1"]["origin"] == "assistant"
+    assert "origin" not in updated["files"]["mystery-1"]
+
+
+def test_process_archived_files_persists_origin_from_sender(tmp_path):
+    conversation = "conv-1"
+    payload = {
+        "chat_messages": [
+            {
+                "sender": "human",
+                "files": [
+                    {
+                        "file_uuid": "img-1",
+                        "file_name": "photo.png",
+                        "file_kind": "image",
+                        "preview_url": "/api/org/files/img-1/preview",
+                    }
+                ],
+            }
+        ]
+    }
+    _write_conversation(tmp_path, conversation, payload, {"media": {}})
+
+    process_archived_files(
+        tmp_path,
+        [(conversation, payload)],
+        lambda url: Fetched(b"image-bytes", "image/webp"),
+    )
+
+    meta = json.loads(meta_path(tmp_path, conversation).read_text())
+    assert meta["files"]["img-1"]["origin"] == "user"
+
+
 def test_process_archived_files_dry_run_plans_recovered_content(tmp_path):
     conversation = "conv-1"
     payload = delivered_blob_payload()

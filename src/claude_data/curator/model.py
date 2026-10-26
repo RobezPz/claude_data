@@ -11,6 +11,7 @@ class Asset:
     message_uuid: str | None = None
     artifact_id: str | None = None
     source_paths: tuple[str, ...] = ()
+    origin: str | None = None
 
 
 @dataclass(frozen=True)
