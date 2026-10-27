@@ -325,9 +325,16 @@ Exports are **self-contained**. The primary action downloads a zip containing:
 - **Markdown**: collection title and description, then each item as
   `## <date> — <source title>`, followed by the question and answer.
   Include source URLs and links to copied assets. Add YAML frontmatter with
-  collection id, title, item count, and export date.
+  collection id, title, item count, and export date (the title is
+  YAML-quoted). The question is emitted as a block quote (`> **Q:**`) so it
+  stands apart from the answer. The whole document is normalized with
+  `mdformat` (prose wrapped at 80 columns, spacing around lists/fences/headings
+  fixed, front matter preserved) so the export is formatter-clean; bare URLs,
+  inline HTML, and long code lines inherited from the archived message text
+  still trip content-only lint rules.
 - **HTML**: standalone page with embedded CSS, sanitized content, and relative
-  links inside the bundle for offline reading.
+  links inside the bundle for offline reading. The question is rendered in a
+  callout (background, accent left border).
 - **JSON**: the collection plus snapshot metadata, suitable for interchange.
 - Referenced images/files/artifacts/generated zips are copied into `assets/`
   with collision-safe names, deduplicated by content hash. Large assets are

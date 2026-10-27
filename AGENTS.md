@@ -17,7 +17,7 @@
 
 ## Toolchain
 
-Python >= 3.13, src layout, `uv_build` backend, one distribution `claude_data` with the `archiver/` and `curator/` subpackages; dev dependency is pytest. Runtime deps include `markdown` and `bleach` for the curator renderer. README mandates uv + ruff + pyrefly, lint before typecheck.
+Python >= 3.13, src layout, `uv_build` backend, one distribution `claude_data` with the `archiver/` and `curator/` subpackages; dev dependency is pytest. Runtime deps include `markdown` and `bleach` for the curator renderer, and `mdformat` + `mdformat-frontmatter` to normalize exported Markdown. README mandates uv + ruff + pyrefly, lint before typecheck.
 
 ## Wiring
 
@@ -45,6 +45,7 @@ Python >= 3.13, src layout, `uv_build` backend, one distribution `claude_data` w
 - The archiver minimizes the headed window through CDP (`Browser.setWindowBounds` → `minimized`) right after launch. It is still a headed browser, Cloudflare still passes, and `document.visibilityState` stays `visible`, so paging/fetching is not throttled. The window flashes briefly during launch; `--show-browser` disables minimization, and the window is restored for login/Cloudflare interaction.
 - The curator pairs messages along the **active path**: start at `current_leaf_message_uuid`, walk `parent_message_uuid`, and stop at `None`/empty/the zero UUID. Fifteen conversations have branch/fallback structure (13 branch, 2 missing a leaf); the fallback is deterministic index order.
 - Curator collections are saved as one whole document with a revision; a stale tab gets `409` and must reload. `collections.json.bak` holds the previous save. `/assets/` rejects paths outside the archive root.
+- `export_collection()` writes `collection.md` through `mdformat` (wrap 80, front-matter plugin), so the file is already formatter-clean; the question is a `> **Q:**` block quote and attachments are a plain `Attachments:` line (an emphasis-only line trips MD036). Remaining lint hits come from archived message text itself (bare URLs, inline HTML, long code lines), not from the exporter.
 - The curator server caches its library but re-stamps it on every request (`conversations/` dir mtime + `index.json` mtime/size) and rebuilds when `sync` changed the archive, so a running `view` picks up new conversations and files on the next browser refresh; `POST /api/reload` forces a rebuild.
 - Five consecutive capture failures abort the run with a "re-run with `--login`" message (session assumed logged out).
 - `attachments[]` are inline text (`extracted_content`) — nothing to download.
@@ -73,4 +74,4 @@ Python >= 3.13, src layout, `uv_build` backend, one distribution `claude_data` w
 
 ## Status (2026-10-26)
 
-194 tests pass; ruff and pyrefly are clean. The local archive holds 351 conversations / 3,377 messages / ~157 MB, including 105 file records (`103 user`, `2 assistant`; 95 present, 1 downloaded, 1 exported, 8 unavailable blobs), 19 exported artifacts, and 55 generated-file zips. The curator derives 1,656 Q&A pairs and serves them through `uv run claude-data view`. `claude-data sync` is a single command now: it fetches new conversations, then their files, zips, and artifacts. Implementation plans: `docs/superpowers/plans/2026-10-04-claude-conversation-archiver.md` and `docs/superpowers/plans/2026-10-25-conversation-curator.md`.
+201 tests pass; ruff and pyrefly are clean. The local archive holds 351 conversations / 3,377 messages / ~157 MB, including 105 file records (`103 user`, `2 assistant`; 95 present, 1 downloaded, 1 exported, 8 unavailable blobs), 19 exported artifacts, and 55 generated-file zips. The curator derives 1,656 Q&A pairs and serves them through `uv run claude-data view`. `claude-data sync` is a single command now: it fetches new conversations, then their files, zips, and artifacts. Implementation plans: `docs/superpowers/plans/2026-10-04-claude-conversation-archiver.md` and `docs/superpowers/plans/2026-10-25-conversation-curator.md`.

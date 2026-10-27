@@ -14,7 +14,7 @@ class PairBuild:
     path_fallback: bool
 
 
-def message_text(message: Message) -> str:
+def message_text(message: Message, separator: str = " ") -> str:
     parts: list[str] = []
     for block in message.content or []:
         if not isinstance(block, dict) or block.get("type") != "text":
@@ -31,7 +31,7 @@ def message_text(message: Message) -> str:
             parts.append(f"[Attachment: {name}]\n\n{extracted.strip()}")
         else:
             parts.append(f"[Attachment: {name}]")
-    return " ".join(parts)
+    return separator.join(parts)
 
 
 def preview_text(message: Message, limit: int = 200) -> str:

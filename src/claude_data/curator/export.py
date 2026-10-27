@@ -10,6 +10,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import quote
 
+import mdformat
+
 from claude_data.archiver.files import safe_filename
 from claude_data.archiver.store import atomic_write_bytes
 from claude_data.curator.library import Library
@@ -26,10 +28,31 @@ pre { overflow-x: auto; padding: 1rem; background: #f6f8fa; border-radius: 6px; 
 code { font-family: ui-monospace, monospace; }
 img { max-width: 100%; }
 details { margin: 0.5rem 0; }
-.question { font-weight: 600; }
+.question { font-weight: 600; background: #f6f8fa; border-left: 4px solid #0969da;
+            border-radius: 0 6px 6px 0; padding: 0.6rem 0.9rem; margin: 1rem 0; }
+.question p:first-child { margin-top: 0; }
+.question p:last-child { margin-bottom: 0; }
 .answer { margin-bottom: 1rem; }
 .asset-note, .meta { color: #656d76; font-size: 0.9rem; }
 """
+
+MARKDOWN_WRAP = 80
+MARKDOWN_EXTENSIONS = {"frontmatter"}
+
+
+def format_markdown(text: str) -> str:
+    """Normalize exported Markdown so the file is already formatter-clean."""
+    return mdformat.text(
+        text, options={"wrap": MARKDOWN_WRAP}, extensions=MARKDOWN_EXTENSIONS
+    )
+
+
+def quote_block(text: str) -> str:
+    """Turn a message into a Markdown block quote, so questions stand out."""
+    lines: list[str] = []
+    for line in text.splitlines():
+        lines.append(">" if not line.strip() else f"> {line}")
+    return "\n".join(lines)
 
 
 @dataclass(frozen=True)
@@ -173,7 +196,7 @@ def export_collection(
         lines = [
             "---",
             f"collection_id: {collection.collection_id}",
-            f"title: {collection.title}",
+            f"title: {json.dumps(collection.title)}",
             f"item_count: {len(collection.items)}",
             f"exported_at: {datetime.now(UTC).isoformat()}",
             "---",
@@ -200,19 +223,21 @@ def export_collection(
                 continue
             pair, messages = resolved_pair
             lines.extend([f"## {item.date} — {source_title}", ""])
-            question_text = message_text(messages[0])
+            question_text = message_text(messages[0], separator="\n\n")
             if question_text:
-                lines.extend([rewrite_links(question_text, local_map), ""])
+                lines.extend(["> **Q:**", ">", quote_block(question_text), ""])
             for answer in messages[1:]:
-                answer_text = message_text(answer)
+                answer_text = message_text(answer, separator="\n\n")
                 if answer_text:
                     lines.extend([rewrite_links(answer_text, local_map), ""])
             pair_assets = _unique_assets(list(pair.assets))
             if pair_assets:
-                lines.append("**Attachments**")
+                lines.append("Attachments:")
                 lines.extend(_asset_links_markdown(pair_assets, mapping))
                 lines.append("")
-        (temp / "collection.md").write_text("\n".join(lines), encoding="utf-8")
+        (temp / "collection.md").write_text(
+            format_markdown("\n".join(lines)), encoding="utf-8"
+        )
 
         html_map = {
             f"assets/{asset.local_path}": mapping[asset.asset_id]

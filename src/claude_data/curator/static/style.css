@@ -333,6 +333,11 @@ button:focus-visible {
 
 .preview .question {
   font-weight: 550;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 6px 6px 0;
+  padding: 0.55rem 0.8rem;
 }
 
 .preview pre {
