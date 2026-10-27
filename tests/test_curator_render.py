@@ -32,6 +32,31 @@ def test_render_markdown_blocks_remote_images():
     assert "remote image" in html
 
 
+def test_render_markdown_keeps_content_h1_headings_literal():
+    html = render_markdown("# Done! Saved: 10")
+
+    assert "<h1>" not in html
+    assert "# Done! Saved: 10" in html
+
+
+def test_render_markdown_keeps_hash_without_space_literal():
+    html = render_markdown("#scrollableArea is the div")
+
+    assert "<h1>" not in html
+    assert "#scrollableArea" in html
+
+
+def test_render_markdown_keeps_deeper_headings():
+    assert "<h2>Section</h2>" in render_markdown("## Section")
+
+
+def test_render_markdown_keeps_comment_hashes_inside_fenced_code():
+    html = render_markdown("```bash\n# install first\npip install x\n```")
+
+    assert "&#x23; install first" in html or "# install first" in html
+    assert "<h1>" not in html
+
+
 def test_render_message_escapes_tool_input():
     html = render_message(
         msg(

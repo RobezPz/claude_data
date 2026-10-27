@@ -464,14 +464,14 @@ async function renderPreview(pairId) {
     container.appendChild(head);
 
     const questionTitle = document.createElement("h3");
-    questionTitle.textContent = "Question";
+    questionTitle.textContent = "You";
     const question = document.createElement("div");
     question.className = "question";
     question.innerHTML = data.question_html || "<p>(no text)</p>";
     container.append(questionTitle, question);
 
     const answerTitle = document.createElement("h3");
-    answerTitle.textContent = "Answer";
+    answerTitle.textContent = "Claude";
     const answer = document.createElement("div");
     answer.className = "answer";
     answer.innerHTML = data.answer_html || "<p>(no text)</p>";

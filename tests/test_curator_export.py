@@ -148,16 +148,75 @@ def test_rewrite_links_uses_export_paths():
     )
 
 
-def test_export_markdown_blockquotes_the_question(tmp_path):
+def test_export_markdown_attributes_both_speakers(tmp_path):
     markdown, _ = _export_fixture(
         tmp_path, "Why is the sky blue?", "Because of Rayleigh scattering."
     )
 
-    assert "> **Q:**" in markdown
+    assert "> **You:**" in markdown
     assert "> Why is the sky blue?" in markdown
+    assert "**Claude:**" in markdown
     answer_index = markdown.index("Because of Rayleigh scattering.")
+    label_index = markdown.index("**Claude:**")
+    assert label_index < answer_index
     assert markdown[answer_index - 1] == "\n"
     assert not markdown[:answer_index].rstrip().endswith(">")
+
+
+def test_export_markdown_escapes_leading_headings_in_message_text(tmp_path):
+    markdown, _ = _export_fixture(
+        tmp_path,
+        question_blocks=[{"type": "text", "text": "# Done! Saved: 10 | Failed: 0"}],
+        answer_text="# Progress\n\nAll good.",
+    )
+
+    assert "> \\# Done! Saved: 10 | Failed: 0" in markdown
+    assert "\\# Progress" in markdown
+    assert "> # Done!" not in markdown
+    assert mdformat.text(markdown, options=WRAP, extensions=FRONTMATTER) == markdown
+
+
+def test_export_markdown_keeps_pasted_rules_out_of_the_heading_parser(tmp_path):
+    markdown, _ = _export_fixture(
+        tmp_path,
+        question_blocks=[
+            {
+                "type": "text",
+                "text": "No next-page button found after page 2. Done!\n"
+                "=======================================================\n"
+                "Done! Saved: 10 | Failed: 0",
+            }
+        ],
+        answer_text="Okay.",
+    )
+
+    assert "> #" not in markdown
+    assert "=====" in markdown
+    assert mdformat.text(markdown, options=WRAP, extensions=FRONTMATTER) == markdown
+
+
+def test_export_markdown_keeps_hash_without_space_as_text(tmp_path):
+    markdown, _ = _export_fixture(
+        tmp_path,
+        question_blocks=[{"type": "text", "text": "#scrollableArea is the div"}],
+        answer_text="Right.",
+    )
+
+    assert "> #scrollableArea is the div" in markdown
+    assert mdformat.text(markdown, options=WRAP, extensions=FRONTMATTER) == markdown
+
+
+def test_export_markdown_keeps_comment_hashes_inside_fenced_code(tmp_path):
+    markdown, _ = _export_fixture(
+        tmp_path,
+        question_blocks=[
+            {"type": "text", "text": "Run this:\n\n```bash\n# install first\npip install x\n```"}
+        ],
+        answer_text="Done.",
+    )
+
+    assert "# install first" in markdown
+    assert "\\# install first" not in markdown
 
 
 def test_export_markdown_keeps_separate_text_blocks_as_paragraphs(tmp_path):
@@ -210,6 +269,17 @@ def test_export_html_styles_the_question_as_a_callout(tmp_path):
     rule = html.split(".question {")[1].split("}")[0]
     assert "border-left" in rule
     assert "background" in rule
+
+
+def test_export_html_attributes_both_speakers(tmp_path):
+    _, html = _export_fixture(tmp_path, "Why?", "Because.")
+
+    assert '<p class="speaker">You</p>' in html
+    assert '<p class="speaker">Claude</p>' in html
+    question = html.split('<section class="question">')[1].split("</section>")[0]
+    assert "You" in question
+    answer = html.split('<section class="answer">')[1].split("</section>")[0]
+    assert "Claude" in answer
 
 
 def test_export_front_matter_quotes_titles_with_colons(tmp_path):

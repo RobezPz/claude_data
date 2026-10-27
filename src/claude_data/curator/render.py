@@ -64,7 +64,44 @@ def _rewrite_local_links(text: str, link_prefix: str) -> str:
     return text
 
 
+_SETEXT_UNDERLINE = re.compile(r"^[ \t]*[=-]+[ \t]*$")
+_CONTENT_HEADING = re.compile(r"^#(?:[^#\s]|$|[ \t])")
+
+
+def escape_heading_syntax(text: str) -> str:
+    """Keep pasted `#` lines and `====`/`----` rules out of the heading parser.
+
+    Archived messages often paste script output: comment lines starting with `#`
+    and `====` separators that follow a paragraph become ATX/setext headings,
+    which splits the export's outline and defeats prose wrapping. A `#` line
+    that is not a `##`+ heading of its own is escaped; a setext rule gets blank
+    lines around it so it stays a paragraph. Fenced code is left alone so
+    comments inside code blocks keep their bytes.
+    """
+    lines: list[str] = []
+    in_fence = False
+    for line in text.splitlines():
+        stripped = line.lstrip()
+        if stripped.startswith(("```", "~~~")):
+            in_fence = not in_fence
+            lines.append(line)
+            continue
+        if in_fence:
+            lines.append(line)
+            continue
+        if _CONTENT_HEADING.match(stripped):
+            lines.append(line.replace("#", "\\#", 1))
+            continue
+        previous = lines[-1] if lines else ""
+        if previous.strip() and _SETEXT_UNDERLINE.fullmatch(line):
+            lines.extend(["", line, ""])
+            continue
+        lines.append(line)
+    return "\n".join(lines)
+
+
 def render_markdown(text: str, link_prefix: str = "/assets/") -> str:
+    text = escape_heading_syntax(text)
     text = _rewrite_local_links(text, link_prefix)
     rendered = markdown.markdown(text, extensions=["fenced_code", "tables"])
     cleaned = bleach.clean(

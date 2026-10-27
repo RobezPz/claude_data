@@ -326,15 +326,21 @@ Exports are **self-contained**. The primary action downloads a zip containing:
   `## <date> — <source title>`, followed by the question and answer.
   Include source URLs and links to copied assets. Add YAML frontmatter with
   collection id, title, item count, and export date (the title is
-  YAML-quoted). The question is emitted as a block quote (`> **Q:**`) so it
-  stands apart from the answer. The whole document is normalized with
-  `mdformat` (prose wrapped at 80 columns, spacing around lists/fences/headings
-  fixed, front matter preserved) so the export is formatter-clean; bare URLs,
-  inline HTML, and long code lines inherited from the archived message text
-  still trip content-only lint rules.
+  YAML-quoted). Both turns are attributed: the question is a block quote
+  headed `> **You:**` and each answer starts with `**Claude:**`, so a question
+  Claude asks inside its own answer is never mistaken for the user's. The whole
+  document is normalized with `mdformat` (prose wrapped at 80 columns, spacing
+  around lists/fences/headings fixed, front matter preserved) so the export is
+  formatter-clean. Archived text that would otherwise be parsed as document
+  structure is neutralized first: a `#` line outside a code fence is escaped
+  and a pasted `====`/`----` rule gets blank lines around it, because pasted
+  script output would otherwise become an h1 (swallowing whole paragraphs and
+  never wrapping). Bare URLs, inline HTML, `__init__`-style names and long code
+  lines inherited from the message text still trip content-only lint rules.
 - **HTML**: standalone page with embedded CSS, sanitized content, and relative
   links inside the bundle for offline reading. The question is rendered in a
-  callout (background, accent left border).
+  callout (background, accent left border), and each section carries a
+  `You`/`Claude` speaker label.
 - **JSON**: the collection plus snapshot metadata, suitable for interchange.
 - Referenced images/files/artifacts/generated zips are copied into `assets/`
   with collision-safe names, deduplicated by content hash. Large assets are

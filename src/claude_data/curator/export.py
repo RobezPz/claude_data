@@ -17,7 +17,7 @@ from claude_data.archiver.store import atomic_write_bytes
 from claude_data.curator.library import Library
 from claude_data.curator.model import Asset, Collection, Pair
 from claude_data.curator.pairs import message_text
-from claude_data.curator.render import render_pair
+from claude_data.curator.render import escape_heading_syntax, render_pair
 
 EXPORT_CSS = """
 body { font-family: system-ui, sans-serif; max-width: 900px; margin: 2rem auto;
@@ -28,9 +28,11 @@ pre { overflow-x: auto; padding: 1rem; background: #f6f8fa; border-radius: 6px; 
 code { font-family: ui-monospace, monospace; }
 img { max-width: 100%; }
 details { margin: 0.5rem 0; }
+.speaker { color: #656d76; font-size: 0.8rem; font-weight: 600; letter-spacing: 0.04em;
+           text-transform: uppercase; margin: 1rem 0 0.35rem; }
 .question { font-weight: 600; background: #f6f8fa; border-left: 4px solid #0969da;
             border-radius: 0 6px 6px 0; padding: 0.6rem 0.9rem; margin: 1rem 0; }
-.question p:first-child { margin-top: 0; }
+.question .speaker { margin-top: 0; }
 .question p:last-child { margin-bottom: 0; }
 .answer { margin-bottom: 1rem; }
 .asset-note, .meta { color: #656d76; font-size: 0.9rem; }
@@ -223,13 +225,24 @@ def export_collection(
                 continue
             pair, messages = resolved_pair
             lines.extend([f"## {item.date} — {source_title}", ""])
-            question_text = message_text(messages[0], separator="\n\n")
+            question_text = escape_heading_syntax(
+                message_text(messages[0], separator="\n\n")
+            )
             if question_text:
-                lines.extend(["> **Q:**", ">", quote_block(question_text), ""])
+                lines.extend(["> **You:**", ">", quote_block(question_text), ""])
             for answer in messages[1:]:
-                answer_text = message_text(answer, separator="\n\n")
+                answer_text = escape_heading_syntax(
+                    message_text(answer, separator="\n\n")
+                )
                 if answer_text:
-                    lines.extend([rewrite_links(answer_text, local_map), ""])
+                    lines.extend(
+                        [
+                            "**Claude:**",
+                            "",
+                            rewrite_links(answer_text, local_map),
+                            "",
+                        ]
+                    )
             pair_assets = _unique_assets(list(pair.assets))
             if pair_assets:
                 lines.append("Attachments:")
@@ -272,11 +285,13 @@ def export_collection(
             )
             html_parts.append(
                 '<section class="question">'
+                '<p class="speaker">You</p>'
                 + rewrite_links(rendered["question_html"], html_map)
                 + "</section>"
             )
             html_parts.append(
                 '<section class="answer">'
+                '<p class="speaker">Claude</p>'
                 + rewrite_links(rendered["answer_html"], html_map)
                 + "</section>"
             )
