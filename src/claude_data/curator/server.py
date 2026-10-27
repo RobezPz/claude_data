@@ -1,5 +1,6 @@
 import json
 import mimetypes
+import threading
 import webbrowser
 from dataclasses import asdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -21,6 +22,23 @@ API_PREFIX = "/api/"
 ASSET_PREFIX = "/assets/"
 
 
+def _archive_stamp(root: Path) -> tuple[int, int, int]:
+    """Cheap fingerprint of the archive, changing whenever `sync` rewrote it.
+
+    `sync` fetches conversations and rewrites their payloads atomically (which
+    bumps the `conversations/` directory mtime) and rebuilds `index.json` last.
+    """
+    conversations = root / "conversations"
+    index = root / "index.json"
+    conversations_mtime = (
+        conversations.stat().st_mtime_ns if conversations.is_dir() else 0
+    )
+    if not index.is_file():
+        return (conversations_mtime, 0, 0)
+    stat = index.stat()
+    return (conversations_mtime, stat.st_mtime_ns, stat.st_size)
+
+
 class CuratorServer(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
@@ -28,6 +46,7 @@ class CuratorServer(ThreadingHTTPServer):
     archive_root: Path
     data_dir: Path
     static_dir: Path
+    _library_stamp: tuple[int, int, int]
 
     def __init__(
         self,
@@ -40,7 +59,24 @@ class CuratorServer(ThreadingHTTPServer):
         self.archive_root = Path(archive_root)
         self.data_dir = Path(data_dir)
         self.static_dir = Path(__file__).parent / "static"
+        self._library_lock = threading.Lock()
         self.library = Library.build(self.archive_root)
+        self._library_stamp = _archive_stamp(self.archive_root)
+
+    def refresh_library(self) -> Library:
+        """Rebuild the library when the archive changed since the last build."""
+        with self._library_lock:
+            stamp = _archive_stamp(self.archive_root)
+            if stamp != self._library_stamp:
+                self.library = Library.build(self.archive_root)
+                self._library_stamp = stamp
+            return self.library
+
+    def reload_library(self) -> Library:
+        with self._library_lock:
+            self.library = Library.build(self.archive_root)
+            self._library_stamp = _archive_stamp(self.archive_root)
+            return self.library
 
 
 def _collection_from_dict(raw: object) -> Collection:
@@ -113,18 +149,19 @@ class CuratorHandler(BaseHTTPRequestHandler):
         path = unquote(parsed.path)
 
         if path == "/api/library":
-            self._send_json(self.server.library.to_json())
+            self._send_json(self.server.refresh_library().to_json())
             return
 
         if path.startswith(API_PREFIX + "pairs/"):
             pair_id = path[len(API_PREFIX + "pairs/") :]
+            library = self.server.refresh_library()
             try:
-                content = self.server.library.pair_content(pair_id)
+                content = library.pair_content(pair_id)
             except KeyError:
                 self._error(404, f"unknown pair: {pair_id}")
                 return
-            pair = self.server.library.pair_by_id[pair_id]
-            messages = self.server.library.pair_messages[pair_id]
+            pair = library.pair_by_id[pair_id]
+            messages = library.pair_messages[pair_id]
             rendered = render_pair(pair, messages[0], messages[1:])
             self._send_json(
                 {
@@ -146,7 +183,7 @@ class CuratorHandler(BaseHTTPRequestHandler):
                     "restore from collections.json.bak",
                 )
                 return
-            collections = self.server.library.reconcile(state.collections)
+            collections = self.server.refresh_library().reconcile(state.collections)
             self._send_json(
                 {
                     "revision": state.revision,
@@ -166,7 +203,7 @@ class CuratorHandler(BaseHTTPRequestHandler):
                     "restore from collections.json.bak",
                 )
                 return
-            collections = self.server.library.reconcile(state.collections)
+            collections = self.server.refresh_library().reconcile(state.collections)
             collection = next(
                 (
                     candidate
@@ -234,11 +271,11 @@ class CuratorHandler(BaseHTTPRequestHandler):
         if path != "/api/reload":
             self._error(404, f"unknown path: {path}")
             return
-        self.server.library = Library.build(self.server.archive_root)
+        library = self.server.reload_library()
         self._send_json(
             {
-                "sources": len(self.server.library.sources),
-                "pairs": len(self.server.library.pairs),
+                "sources": len(library.sources),
+                "pairs": len(library.pairs),
             }
         )
 

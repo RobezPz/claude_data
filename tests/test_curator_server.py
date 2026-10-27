@@ -6,7 +6,9 @@ from dataclasses import asdict
 from urllib.parse import quote
 
 import pytest
+from curator_fixtures import message, write_conversation  # pyrefly: ignore[missing-import]
 
+from claude_data.archiver.store import atomic_write_json
 from claude_data.curator.server import create_server
 
 
@@ -98,6 +100,74 @@ def test_reload_endpoint(server):
     )
     with urllib.request.urlopen(request) as response:
         assert json.load(response)["pairs"] >= 1
+
+
+def _new_conversation(archive, uuid):
+    payload = {
+        "uuid": uuid,
+        "name": f"Conversation {uuid}",
+        "model": "m",
+        "created_at": "2026-01-02T00:00:00Z",
+        "updated_at": "2026-01-02T00:00:00Z",
+        "current_leaf_message_uuid": f"{uuid}-a1",
+        "chat_messages": [
+            message(f"{uuid}-h1", "human", 0, text="new question"),
+            message(f"{uuid}-a1", "assistant", 1, parent=f"{uuid}-h1", text="new answer"),
+        ],
+    }
+    write_conversation(archive, payload)
+    return payload
+
+
+def test_library_endpoint_picks_up_a_conversation_added_after_start(
+    server, curator_archive
+):
+    srv, url = server
+    assert len(get_json(f"{url}/api/library")["sources"]) == 1
+
+    _new_conversation(curator_archive, "conv-2")
+
+    sources = get_json(f"{url}/api/library")["sources"]
+    assert "claude:conv-2" in {source["source_id"] for source in sources}
+    assert len(srv.library.sources) == 2
+
+
+def test_pair_endpoint_serves_a_conversation_added_after_start(server, curator_archive):
+    _, url = server
+    _new_conversation(curator_archive, "conv-2")
+    pair_id = next(
+        pair["pair_id"]
+        for pair in get_json(f"{url}/api/library")["pairs"]
+        if pair["source_id"] == "claude:conv-2"
+    )
+
+    data = get_json(f"{url}/api/pairs/{quote(pair_id)}")
+
+    assert data["pair"]["source_id"] == "claude:conv-2"
+
+
+def test_library_endpoint_picks_up_a_rewritten_conversation(server, curator_archive):
+    _, url = server
+    assert get_json(f"{url}/api/library")["sources"][0]["title"] == "T"
+
+    path = curator_archive / "conversations" / "conv-1.json"
+    payload = json.loads(path.read_text())
+    payload["name"] = "Renamed"
+    atomic_write_json(path, payload)
+
+    titles = {
+        source["source_id"]: source["title"]
+        for source in get_json(f"{url}/api/library")["sources"]
+    }
+    assert titles["claude:conv-1"] == "Renamed"
+
+
+def test_library_is_cached_while_the_archive_is_unchanged(server):
+    srv, url = server
+    get_json(f"{url}/api/library")
+    first = srv.library
+    get_json(f"{url}/api/library")
+    assert srv.library is first
 
 
 def test_unknown_path_404(server):

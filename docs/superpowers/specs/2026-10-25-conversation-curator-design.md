@@ -250,6 +250,11 @@ same `SourceBundle`; no collector/downloader is in scope now.
   - `POST /api/reload` — rebuild the library from disk.
   - `GET  /api/export/{id}.zip` — self-contained export bundle.
   - `GET  /assets/...` — read-only files under the configured archive root.
+- The library is built at startup and cached, but every request re-reads a
+  cheap archive stamp (`conversations/` directory mtime plus `index.json`
+  mtime and size). If `sync` changed the archive, the library rebuilds before
+  the response, so a running server picks up new conversations, files, and
+  provenance on the next browser refresh without a restart.
 - One atomic `PUT /api/state` is deliberate: create, rename, delete, reorder,
   merge, and split all become one validated document write, so concurrent edits
   cannot interleave.
@@ -291,7 +296,9 @@ Desktop-first single-page app, usable on a laptop.
 - Search filters the library by question/answer preview; filters by provider,
   conversation, and date range.
 - A "reload library" action rebuilds pairs after an archive refresh and reports
-  unresolved collection items.
+  unresolved collection items. Since the server re-stamps the archive on every
+  request, a plain browser refresh already picks up a sync; `/api/reload`
+  remains the explicit trigger.
 
 ### Rendering
 
